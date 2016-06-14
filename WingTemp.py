@@ -1,10 +1,10 @@
 from openmdao.api import Component, ScipyGMRES, Newton, IndepVarComp
+from openmdao.units.units import convert_units as cu
 
 class WingTemp(Component):
     def __init__(self):
         super(WingTemp, self).__init__()
         self.deriv_options['type'] = "cs"
-
 
         self.add_param('sol_heat_flux', 1145.0, desc='solar heat flux', units='W/m**2')
         self.add_param('AMO', 1366.0, desc='', units='W/m**2')
@@ -21,16 +21,14 @@ class WingTemp(Component):
         self.add_output('rad_heat', 432.0, desc='Radiation Heat', units='W')
 
     def solve_nonlinear(self, p, u, r):
-
-        s, c, r = self.apply_nonlinear(p,u,r)
-        u['sol_heat'] = s
+        s, c, r = self.apply_nonlinear(p, u, r)
+        u['sol_heat'] = s  # don't duplicate calcs from apply_nonL
         u['conv_heat'] = c
         u['rad_heat'] = r
 
-
     def apply_nonlinear(self, p, u, r):
         sol_heat = p['sol_heat_flux']*p['area']*p['absorb']
-        r['sol_heat'] = u['sol_heat'] - sol_heat
+        r['sol_heat'] = u['sol_heat'] - sol_heat  # manual residual
 
         conv_heat = 1.32*((u['plateTemp']-p['airTemp'])**0.25)*(u['plateTemp']-p['airTemp'])
         r['conv_heat'] = u['conv_heat'] - conv_heat
@@ -67,11 +65,11 @@ if __name__ == '__main__':
 
     p.run()
     print('Results:  Sky Temp |    Plate Temp  ')
-    print('            -34C   |  %3.1f degC  %3.1f degF ' % (p['comp.plateTemp'], p['comp.plateTemp']))
+    print('            -34C   |  %3.1f degC  %3.1f degF ' % (cu(p['comp.plateTemp'],'degK','degC'), cu(p['comp.plateTemp'],'degK','degF')))
 
     p['comp.skyTemp'] = 273+10
     p.run()
-    print('             10C   |  %3.1f degC  %3.1f degF ' % (p['comp.plateTemp'], p['comp.plateTemp']))
+    print('             10C   |  %3.1f degC  %3.1f degF ' % (cu(p['comp.plateTemp'],'degK','degC'), cu(p['comp.plateTemp'],'degK','degF')))
 
 # NASA TM 2008 215633 Table 4-8
 #              |  Design High Solar Radiation |
