@@ -1,5 +1,6 @@
 from openmdao.api import Component, ScipyGMRES, Newton, IndepVarComp
 from openmdao.units.units import convert_units as cu
+from math import pi
 
 class PowerBus(Component):
     def __init__(self):
@@ -41,6 +42,11 @@ class PowerBus(Component):
         # Equivalent Bundled Wire Table
         # http://www.rapidtables.com/calc/wire/wire-gauge-chart.htm
 
+        # MatWeb ETP copper
+        self.add_param('cpcu', 0.385, desc='Cp of copper', units='J/gC')
+        self.add_param('rhocu', 8.89, desc='density of copper', units='g/cc')
+        self.add_param('Resistivity', 1.72e-8, desc='electrical resistivity', units='Ohms*m')
+
         #todo lookup function to calc wire area given stand sizes
 
         self.add_param('QperL', 33., desc='Heat per unit length', units='W/m')
@@ -58,38 +64,68 @@ class PowerBus(Component):
         self.add_output('A_dL', 0.0163, desc='Area/Length (circumference)')
         self.add_output('deltaT2', 127., desc='wire temp rise above the environment', units='degC')
 
+    def solve_nonlinear(self, p, u, r):
+        u['to_current'] = p['to_pwr']/p['efficiency']/p['busVoltage']
+        u['peak_current'] = p['peak_pwr']/p['efficiency']/p['busVoltage']
+        u['climb_current'] = p['climb_pwr']/p['efficiency']/p['busVoltage']
+        u['cruise_current'] = p['cruise_pwr']/p['efficiency']/p['busVoltage']
+        u['deltaT'] = p['Trating']-p['Tambient']
 
-        def solve_nonlinear(self, p, u, r):
-            u['to_current'] = p['to_pwr']/p['efficiency']/p['busVoltage']
-            u['peak_current'] = p['peak_pwr']/p['efficiency']/p['busVoltage']
-            u['climb_current'] = p['climb_pwr']/p['efficiency']/p['busVoltage']
-            u['cruise_current'] = p['cruise_pwr']/p['efficiency']/p['busVoltage']
-            u['deltaT'] = p['Trating']-p['Tambient']
 
+        # In this case the SAE graph shows with a temperature difference
+        # of 110C (150C-40C, i.e. rated temperature - environment temperature)
+        # the allowable current is 200A. Which mean with 200A going through it,
+        # the wire should be at its rated temperature when in a 40C environment.
+        # The spreadsheet calculated 167C which is rather close considering
+        # the simplified equation used.
 
-            '''In this case the SAE graph shows with a temperature difference
-            of 110C (150C-40C, i.e. rated temperature - environment temperature)
-            the allowable current is 200A. Which mean with 200A going through it,
-            the wire should be at its rated temperature when in a 40C environment.
-            The spreadsheet calculated 167C which is rather close considering
-            the simplified equation used. '''
-
-            u['A_dL'] = p['wireD']*math.pi()
-            turbulent = 0
-            if turbulent:
-                u['deltaT2'] = (p['QperL']*(1./u['A_dL'])*1./1.24)**(1/1.33)
-            else:
-                u['deltaT2'] = (p['QperL']*(1./u['A_dL'])*(p['wireD']**0.24)/1.32)**(1/1.25)
+        u['A_dL'] = p['wireD']*pi
+        turbulent = 0
+        if turbulent:
+            u['deltaT2'] = (p['QperL']*(1./u['A_dL'])*1./1.24)**(1/1.33)
+        else:
+            u['deltaT2'] = (p['QperL']*(1./u['A_dL'])*(p['wireD']**0.24)/1.32)**(1/1.25)
 
 
 if __name__ == '__main__':
-    from openmdao.core.problem import Problem
-    from openmdao.core.group import Group
+    from openmdao.api import Problem, Group
+    import matplotlib.pyplot as plt
 
     p = Problem()
     root = p.root = Group()
 
     root.add('comp', PowerBus())
+
+    p.setup()
+
+
+    p.run()
+
+    # Plot Transient
+    time = [0.]                                 # 0
+    time.append(time[0]+p['comp.to_period'])    # 1
+    time.append(time[1]+1.)                     # 2
+    time.append(time[1]+p['comp.peak_period'])  # 3
+    time.append(time[3]+1.)                     # 4
+    time.append(time[3]+p['comp.climb_period']) # 5
+    time.append(time[5]+1.)                     # 6
+    time.append(time[5]+p['comp.cruise_period'])# 7
+
+    toc = p['comp.to_current']
+    pc = p['comp.peak_current']
+    cc = p['comp.climb_current']
+    crc = p['comp.cruise_current']
+    current = [toc, toc, pc, pc, cc, cc, crc, crc]
+
+    print(time, current)
+    plt.plot(time,current)
+    plt.xlabel('Elapsed Time (sec)')
+    plt.ylabel('Bus Current (A)')
+    plt.title('Bus Current vs Time')
+    plt.show()
+
+
+    #
 
     #Check Case: Steady State #4 200A 40C
 
