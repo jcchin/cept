@@ -30,21 +30,16 @@ class PowerBus(Component):
         # Altitude de-rating Not Applicable below 60,000ft
 
         cable_data = [\
-        {'Wire':1, 'strands':779, 'AWG':30, 'AperStand':0.0509, 'Resistance':0.0456, 'A40':293, 'A71':270},
+        {'Wire':1, 'strands':779, 'AWG':30, 'AperStand':0.0509, 'Resistance':0.4056, 'A40':293, 'A71':270},
         {'Wire':2, 'strands':665, 'AWG':30, 'AperStand':0.0509, 'Resistance':0.5114, 'A40':255, 'A71':230},
         {'Wire':4, 'strands':133, 'AWG':25, 'AperStand':0.1624, 'Resistance':0.8132, 'A40':190, 'A71':170}]
 
         self.add_param('cable_data', cable_data)
-        # self.add_param('cable1', 293., desc='Ampacity at 40degC of copper gauge#1')
-        # self.add_param('cable2', 255., desc='Ampacity at 40degC of copper gauge#2')
-        # self.add_param('cable4', 190., desc='Ampacity at 40degC of copper gauge#4')
-        # self.add_param('cable1l', 270., desc='Ampacity at 71degC of copper gauge#1')
-        # self.add_param('cable2l', 230., desc='Ampacity at 71degC of copper gauge#2')
-        # self.add_param('cable4l', 170., desc='Ampacity at 71degC of copper gauge#4')
 
         # Equivalent Bundled Wire Table
         # http://www.rapidtables.com/calc/wire/wire-gauge-chart.htm
         # http://www.faa.gov/documentLibrary/media/Advisory_Circular/Chapter_11.pdf
+        # Figure 11-4b page 33
 
         # MatWeb ETP copper
         self.add_param('cpcu', 0.385, desc='Cp of copper', units='J/gC')
@@ -55,6 +50,9 @@ class PowerBus(Component):
 
         self.add_param('QperL', 33., desc='Heat per unit length', units='W/m')
         self.add_param('wireD', 0.0052, desc='Wire Diameter', units='m')
+
+        self.add_param('n_hl_motors', 6., desc='Number of High Lift Motors')
+        self.add_param('hlpower', 10000., desc='distributed motor power during take-off', units='W')
 
         self.add_output('deltaT', 79., desc='temperature difference between rated temperature and actual free air temperature', units='degC')
         self.add_output('to_current', 0., units='A')
@@ -67,6 +65,7 @@ class PowerBus(Component):
         self.add_output('wireTemp', 167., desc='wire Temperature', units='degC')
 
         self.add_output('cable_out',[0.])
+        self.add_output('hl_current', 160., desc='current for all motors on one bus', units='A')
 
     def solve_nonlinear(self, p, u, r):
         u['to_current'] = p['to_pwr']/p['efficiency']/p['busVoltage']
@@ -84,17 +83,12 @@ class PowerBus(Component):
 
         pc = u['peak_current']
         cd = p['cable_data']
-        cable_output = [\
-        {'Wire':1, 'heat':pc**2*cd[0]['Resistance'], 'roc':30, 'area':cd[0]['strands']*cd[0]['AperStand']},
-        {'Wire':2, 'heat':pc**2*cd[1]['Resistance'], 'roc':30, 'area':cd[0]['strands']*cd[1]['AperStand']},
-        {'Wire':4, 'heat':pc**2*cd[2]['Resistance'], 'roc':25, 'area':cd[0]['strands']*cd[2]['AperStand']}]
 
-        for row in cable_output:
-            row['heat_cap'] = row['area']/1000. * p['cpcu'] * p['rhocu']
-            row['roc'] = row['heat_cap']*row['heat']
-
-
-        u['cable_out'] = cable_output
+        for i,row in enumerate(cd):
+            row['area'] = cd[i]['strands']*cd[i]['AperStand']
+            row['heat'] = pc**2*(cd[i]['Resistance']/1000.)
+            row['heat_cap'] = row['area'] * p['cpcu'] * p['rhocu']
+            row['roc'] = row['heat']/row['heat_cap']
 
         u['A_dL'] = p['wireD']*pi
         turbulent = 0
@@ -104,6 +98,8 @@ class PowerBus(Component):
             u['deltaT2'] = (p['QperL']*(1./u['A_dL'])*(p['wireD']**0.24)/1.32)**(1/1.25)
 
         u['wireTemp'] = u['deltaT2']+p['Tambient']
+
+        u['hl_current'] = p['n_hl_motors']*p['hlpower']/p['efficiency']/p['busVoltage']
 
 if __name__ == '__main__':
     from openmdao.api import Problem, Group
@@ -121,15 +117,21 @@ if __name__ == '__main__':
     p.run()
     wT = p['comp.wireTemp']
     print('Wire Temp(C): ', wT , 'Expected: 150degC', 'error %(w.r.t degK):', 100.*(wT - 150.)/(wT+273.), '%')
+
     #Steady State #4AWG 200A 71C
     p['comp.Tambient'] = 71.
     p.run()
+    print('Wire Temp(C): ', wT , 'Expected: 150degC', 'error %(w.r.t degK):', 100.*(wT - 150.)/(wT+273.), '%')
+
     #Steady State #4AWG 120A 71C
     p['comp.Tambient'] = 71.
     p.run()
+    print('Wire Temp(C): ', wT , 'Expected: 150degC', 'error %(w.r.t degK):', 100.*(wT - 150.)/(wT+273.), '%')
     wT = p['comp.wireTemp']
-    co = p['comp.cable_out']
-    print('Time to reach 150degC after 200A is applied: ', (150-wT)/co[2]['roc'])
+    co = p['comp.cable_data']
+    print('Time to reach 150degC after 200A is applied:', (150-128)/co[2]['roc'], 'seconds')
+
+    # High Lift Distributed Small Motors
 
     # Plot Transient
     time = [0.]                                 # 0
@@ -144,8 +146,10 @@ if __name__ == '__main__':
     toc, pc, cc, crc = p['comp.to_current'], p['comp.peak_current'], p['comp.climb_current'], p['comp.cruise_current']
     current = [toc, toc, pc, pc, cc, cc, crc, crc]
 
-    plt.plot(time,current)
-    plt.xlabel('Elapsed Time (sec)')
-    plt.ylabel('Bus Current (A)')
-    plt.title('Bus Current vs Time')
-    plt.show()
+    plot = 0
+    if plot:
+        plt.plot(time,current)
+        plt.xlabel('Elapsed Time (sec)')
+        plt.ylabel('Bus Current (A)')
+        plt.title('Bus Current vs Time')
+        plt.show()
