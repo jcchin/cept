@@ -21,6 +21,18 @@ class InverterSink(Component):
         self.add_param('fin_gap', 0.7, desc='Min spacing between fins', units='mm')
 
         self.add_param('V_in', 20., desc='incoming airflow speed', units='m/s')
+
+        self.add_param('rho', 1.2, desc='density of air', units='kg/m**3')
+
+        self.add_output('Dh', desc='hydraulic diameter', units='m')
+        self.add_output('Lstar', desc='characteristic length', units='m')
+        self.add_output('V_avg', 10., desc='average airflow through the flow channels', units='m/s')
+        self.add_output('sigma', desc='ratio of flow channel areas to approaching flow area')
+        self.add_output('Kc', desc='pressure loss coefficient due to sudden flow compression')
+        self.add_output('Ke', desc='pressure loss coefficient due to sudden flow expansion')
+        self.add_output('f', desc='friction factor for fully developed laminar flow, based on fin aspect ratio')
+        self.add_output('f_app', desc='apparent friction factor for hydrodynamically developing \
+                                laminar flow, based on f')
         # material props
         self.add_param('h', 20., desc='fin heat transfer coefficient', units='W/(m**2*K)')
         self.add_param('case_t', 150., desc='thermal conductivity of the casing, Al-6061-T6', units='W/(m*K)' )
