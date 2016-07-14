@@ -1,6 +1,6 @@
 from openmdao.api import Component, ScipyGMRES, NLGaussSeidel, IndepVarComp, ScipyOptimizer
 from openmdao.units.units import convert_units as cu
-from numpy import tanh
+from numpy import tanh, arange
 from numpy import sqrt
 from openmdao.devtools.partition_tree_n2 import view_tree
 
@@ -15,13 +15,19 @@ class Balance(Component):
         super(Balance, self).__init__()
         self.deriv_options['type'] = "fd"
         self.add_state('V_0', 10.,   units="m/s")
+        self.add_state('h_0', 20.)
+
         self.add_param('V_avg', 20.)
+        self.add_param('h', 20.)
+
         #self.add_state('fin_w')
 
     def solve_nonlinear(self, p,u,r):
         u['V_0'] = p['V_avg']
+        u['h_0'] = p['h']
     def apply_nonlinear(self, p,u,r):
         r['V_0'] = (p['V_avg'] - u['V_0'])
+        r['h_0'] = (p['h'] - u['h_0'])
 
 class InverterSink(Component):
     def __init__(self):
@@ -31,13 +37,14 @@ class InverterSink(Component):
         self.add_param('Inv_eff', 0.98, desc='inverter efficiency')
         self.add_param('T_air', 47., desc='Cooling Air Temp', units='degC')
         self.add_param('T_max', 80., desc='Maximum Electronics Temp', units='degC')
-        self.add_param('sink_w', 192., desc='Heat Sink Base Width', units='mm')
-        self.add_param('sink_l', 160., desc='Heat Sink Base Length', units='mm')
-        self.add_param('sink_h', 2.0, desc='Heat Sink Base Height', units='mm')
-        self.add_param('fin_w', 0.9, desc='Heat sink fin width', units='mm')
+        self.add_param('sink_w', .192, desc='Heat Sink Base Width', units='m')
+        self.add_param('sink_l', .160, desc='Heat Sink Base Length', units='m')
+        self.add_param('sink_h', .002, desc='Heat Sink Base Height', units='m')
+        self.add_param('fin_w', 0.0009, desc='Heat sink fin width', units='m')
         self.add_param('V_0', 20., desc='initial average velocity guess', units='m/s')
+        self.add_param('h_0', 20., desc='initial average velocity guess', units='W/(m**2*K)')
         self.add_param('rho', 1.158128, desc='density of air', units='kg/m**3')
-        self.add_param('fin_gap', 0.7, desc='Min spacing between fins', units='mm')
+        self.add_param('fin_gap', 0.0007, desc='Min spacing between fins', units='m')
         self.add_param('mu', 0.000018, desc='dynamic viscosity',units='Pa*s')
         self.add_param('Cp', 1004.088235, desc='specific heat at altitude', units='J/(kg*K)')
         self.add_param('k_air', 0.026726, desc='thermal conductivity of air', units='W/(m*K')
@@ -63,7 +70,7 @@ class InverterSink(Component):
         self.add_output('R_hs', 0.05, desc='Heat Sink Resistance', units='degC/W')
         self.add_output('n_fins', 137., desc='Number of fins that can fit on the sink')
         self.add_output('min_area', 1.4, desc='Minimum cooling area needed', units='m**2')
-        self.add_output('fin_h', 32., desc='Fin height', units='mm')
+        self.add_output('fin_h', .032, desc='Fin height', units='m')
         # Pressure drop calcs
         self.add_output('Q', 10., desc='volumetric flow rate', units='kg/s')
         self.add_output('dP1', 1.0, desc='pressure drop based on friction', units='Pa')
@@ -76,37 +83,37 @@ class InverterSink(Component):
         pwr = p['InvPwr']*(1.-p['Inv_eff'])
         Abase = p['sink_w']*p['sink_l']
         u['n_fins'] = p['sink_w']/(p['fin_w']+p['fin_gap'])
-        u['min_area'] = pwr/(u['h']*(p['T_max']-p['T_air']))
-        u['fin_h'] = 0.5*cu(u['min_area'],'m**2','mm**2')/(u['n_fins']*p['sink_l'])
-        print(p['fin_w'],p['fin_gap'])
-        print(u['n_fins'])
+        u['min_area'] = pwr/(p['h_0']*(p['T_max']-p['T_air']))
+        u['fin_h'] = 0.5*u['min_area']/(u['n_fins']*p['sink_l'])
+        # print(p['fin_w'],p['fin_gap'])
+        # print(u['n_fins'])
         h = u['fin_h']
         H = h + p['sink_h']
         b = p['fin_gap']
-        bm = cu(b,'mm','m')
+        bm = b
         E_Abase = (u['n_fins']-1.)*b*p['sink_l']
         Afin = 2*u['fin_h']*p['sink_l']
         u['Rmax'] = p['T_max'] - p['T_air'] / pwr
         V = p['V_0']
         mu = p['mu']
-        lm = cu(p['sink_l'],'mm','m')
+        lm = p['sink_l']
         Pr = u['Pr'] = (mu*p['Cp'])/p['k_air']
         # Valid range for Re is 0.26 <Reb < 175
         Re = u['Re'] = (p['rho']*V*bm*bm)/(mu*lm)
         # Teertstra, P., Yovanovich, M.M., and Culham, J.R., "Analytical Forced Convection Modeling of Plate Fin Heat Sinks," Proceedings of 15th IEEE Semi-Therm Symposium, pp. 34-41, 1999.
         Nu = u['Nu'] = ((1/(((Re*Pr)/2)**3))+(1/(0.644*sqrt(Re)*Pr**0.33*sqrt(1+(3.65/(sqrt(Re)))))**3))**-0.33
         u['h'] = Nu*p['k_air']/bm # heat transfer, not to be confused with fin height
-        m = sqrt(2.*h/p['k_fin']*cu(p['fin_t'],'mm','m'))
+        m = sqrt(2.*h/p['k_fin']*p['fin_t'])
         u['fin_eff'] = tanh(m*h)/(m*h)
-        u['R_hs'] = 1./(u['h']*(cu(E_Abase, 'mm**2', 'm**2')+u['n_fins']*u['fin_eff']*cu(Afin, 'mm**2', 'm**2')))
-        u['R_tot'] = u['R_hs'] + ((cu(H, 'mm', 'm')-cu(h, 'mm','m'))/(p['k_fin']*cu(Abase, 'mm**2', 'm**2')))
-        #u['G'] = p['V_in']*u['n_fins']*bm*cu(h,'mm','m')
+        u['R_hs'] = 1./(u['h']*(E_Abase+u['n_fins']*u['fin_eff']*Afin))
+        u['R_tot'] = u['R_hs'] + ((H-h)/(p['k_fin']*Abase))
+        #u['G'] = p['V_in']*u['n_fins']*bm*h
         s = u['sigma'] = 1- (u['n_fins']*p['fin_w'])/p['sink_w']
         u['Ke'] = (1-s**2)**2
         u['Kc'] = 0.42 * (1-s**2)
         Dh = u['Dh'] = 2.*bm
         u['Lstar'] = lm/Dh/Re
-        lamb = u['lambda'] = bm/cu(h,'mm','m')
+        lamb = u['lambda'] = bm/h
         u['f'] = (24.-32.527*lamb + 46.721*lamb**2 - 40.829*lamb**3 + 22.954*lamb**4 - 6.089*lamb**5 ) / Re
         u['f_app'] = sqrt(((3.44/sqrt(u['Lstar']))**2 + (u['f']*Re)**2))/Re
         rho = p['rho']
@@ -114,7 +121,7 @@ class InverterSink(Component):
         #volumetric flow rate through a single gap
         u['Q'] = (h*u['dP1']*p['fin_gap']**3)/(12*mu*p['sink_l'])
         #assumed same velocity through all
-        u['V_avg'] = u['Q']/(p['fin_gap']*h)
+        u['V_avg'] = u['Q']/(p['fin_gap']*h)/1000.
         #u['dP2'] = (rho/2.)*(u['V_out']**2.-p['V_in']**2.)
 
     def apply_nonlinear(self, p, u, r):
@@ -128,11 +135,17 @@ if __name__ == '__main__':
     root = p.root = Group()
     root.add('balance', Balance())
     root.add('inverter', InverterSink())
+
     root.connect('inverter.V_avg','balance.V_avg')
-    driver = p.driver = ScipyOptimizer()
-    driver.options['optimizer'] = 'SLSQP'
-    params = (('fin_gap', 0.7, {'units': 'mm'}),
-            ('fin_w', 0.7, {'units': 'mm'}))
+    root.connect('balance.V_0', 'inverter.V_0')
+
+    root.connect('inverter.h','balance.h')
+    root.connect('balance.h_0', 'inverter.h_0')
+
+    # driver = p.driver = ScipyOptimizer()
+    # driver.options['optimizer'] = 'SLSQP'
+    params = (('fin_gap', 0.0007, {'units': 'm'}),
+            ('fin_w', 0.0009, {'units': 'm'}))
     root.add('input_vars', IndepVarComp(params))
     root.connect('input_vars.fin_gap', 'inverter.fin_gap')
     root.connect('input_vars.fin_w', 'inverter.fin_w')
@@ -144,13 +157,50 @@ if __name__ == '__main__':
     root.ln_solver = ScipyGMRES()
     root.nl_solver = NLGaussSeidel()
     # root.nl_solver.options['iprint'] = 1
-    p.print_all_convergence()
+    #p.print_all_convergence()
     p.setup()
     #root.list_connections()
     # view_tree(p)
     # exit()
-    p.run_once()
+    p.run()
     print('# of fins : %f' %p['inverter.n_fins'])
-    print('Min Area : %f m^2' %p['inverter.min_area'])
-    print('Heat Sink Conductivity (h) : %f W/(m**2*K)' %p['inverter.fin_h'])
-    print('Reynolds # : %f , which must be between 0.26 <Reb < 175' % p['inverter.Re'])
+    print(p['inverter.h'], p['inverter.min_area'], p['inverter.Re'])
+    print('R_hs : %f' %p['inverter.R_hs'])
+    print('V_0, V_avg : %f, %f' %(p['inverter.V_0'],p['inverter.V_avg']))
+    # print('Min Area : %f m^2' %p['inverter.min_area'])
+    # print('Heat Sink Conductivity (h) : %f W/(m**2*K)' %p['inverter.fin_h'])
+    # print('Reynolds # : %f , which must be between 0.26 <Reb < 175' % p['inverter.Re'])
+    print('--------------')
+    for w in arange(0.0007,.002,0.01):
+        p['input_vars.fin_gap'] = w
+
+        p.run()
+        print('# of fins : %f' %p['inverter.n_fins'])
+        print(p['inverter.h'], p['inverter.min_area'], p['inverter.Re'])
+        print('R_hs : %f' %p['inverter.R_hs'])
+        print('V_0, V_avg : %f, %f' %(p['inverter.V_0'],p['inverter.V_avg']))
+        p.run()
+        print('# of fins : %f' %p['inverter.n_fins'])
+        print(p['inverter.h'], p['inverter.min_area'], p['inverter.Re'])
+        print('R_hs : %f' %p['inverter.R_hs'])
+        print('V_0, V_avg : %f, %f' %(p['inverter.V_0'],p['inverter.V_avg']))
+        p.run()
+        print('# of fins : %f' %p['inverter.n_fins'])
+        print(p['inverter.h'], p['inverter.min_area'], p['inverter.Re'])
+        print('R_hs : %f' %p['inverter.R_hs'])
+        print('V_0, V_avg : %f, %f' %(p['inverter.V_0'],p['inverter.V_avg']))
+        p.run()
+        print('# of fins : %f' %p['inverter.n_fins'])
+        print(p['inverter.h'], p['inverter.min_area'], p['inverter.Re'])
+        print('R_hs : %f' %p['inverter.R_hs'])
+        print('V_0, V_avg : %f, %f' %(p['inverter.V_0'],p['inverter.V_avg']))
+        p.run()
+        print('# of fins : %f' %p['inverter.n_fins'])
+        print(p['inverter.h'], p['inverter.min_area'], p['inverter.Re'])
+        print('R_hs : %f' %p['inverter.R_hs'])
+        print('V_0, V_avg : %f, %f' %(p['inverter.V_0'],p['inverter.V_avg']))
+        p.run()
+        print('# of fins : %f' %p['inverter.n_fins'])
+        print(p['inverter.h'], p['inverter.min_area'], p['inverter.Re'])
+        print('R_hs : %f' %p['inverter.R_hs'])
+        print('V_0, V_avg : %f, %f' %(p['inverter.V_0'],p['inverter.V_avg']))
