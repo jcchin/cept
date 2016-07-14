@@ -23,8 +23,10 @@ class Balance(Component):
         #self.add_state('fin_w')
 
     def solve_nonlinear(self, p,u,r):
+
         u['V_0'] = p['V_avg']
         u['h_0'] = p['h']
+
     def apply_nonlinear(self, p,u,r):
         r['V_0'] = (p['V_avg'] - u['V_0'])
         r['h_0'] = (p['h'] - u['h_0'])
@@ -80,6 +82,7 @@ class InverterSink(Component):
         self.add_output('V_avg', 20., desc='computed average velocity guess', units='m/s')
 
     def solve_nonlinear(self, p, u, r):
+
         pwr = p['InvPwr']*(1.-p['Inv_eff'])
         Abase = p['sink_w']*p['sink_l']
         u['n_fins'] = p['sink_w']/(p['fin_w']+p['fin_gap'])
@@ -122,10 +125,12 @@ class InverterSink(Component):
         u['Q'] = (h*u['dP1']*p['fin_gap']**3)/(12*mu*p['sink_l'])
         #assumed same velocity through all
         u['V_avg'] = u['Q']/(p['fin_gap']*h)/1000.
+
+        print "foobar", u['V_avg'], p['V_0']
+
         #u['dP2'] = (rho/2.)*(u['V_out']**2.-p['V_in']**2.)
 
-    def apply_nonlinear(self, p, u, r):
-        pass
+
 if __name__ == '__main__':
     from openmdao.core.problem import Problem
     from openmdao.core.group import Group
@@ -156,8 +161,11 @@ if __name__ == '__main__':
     #top.driver.add_constraint('con2.c2', lower=0.0)
     root.ln_solver = ScipyGMRES()
     root.nl_solver = NLGaussSeidel()
+    root.nl_solver.options['maxiter'] = 5
     # root.nl_solver.options['iprint'] = 1
     #p.print_all_convergence()
+
+    p.root.set_order(['input_vars', 'inverter', 'balance'])
     p.setup()
     #root.list_connections()
     # view_tree(p)
@@ -174,33 +182,4 @@ if __name__ == '__main__':
     for w in arange(0.0007,.002,0.01):
         p['input_vars.fin_gap'] = w
 
-        p.run()
-        print('# of fins : %f' %p['inverter.n_fins'])
-        print(p['inverter.h'], p['inverter.min_area'], p['inverter.Re'])
-        print('R_hs : %f' %p['inverter.R_hs'])
-        print('V_0, V_avg : %f, %f' %(p['inverter.V_0'],p['inverter.V_avg']))
-        p.run()
-        print('# of fins : %f' %p['inverter.n_fins'])
-        print(p['inverter.h'], p['inverter.min_area'], p['inverter.Re'])
-        print('R_hs : %f' %p['inverter.R_hs'])
-        print('V_0, V_avg : %f, %f' %(p['inverter.V_0'],p['inverter.V_avg']))
-        p.run()
-        print('# of fins : %f' %p['inverter.n_fins'])
-        print(p['inverter.h'], p['inverter.min_area'], p['inverter.Re'])
-        print('R_hs : %f' %p['inverter.R_hs'])
-        print('V_0, V_avg : %f, %f' %(p['inverter.V_0'],p['inverter.V_avg']))
-        p.run()
-        print('# of fins : %f' %p['inverter.n_fins'])
-        print(p['inverter.h'], p['inverter.min_area'], p['inverter.Re'])
-        print('R_hs : %f' %p['inverter.R_hs'])
-        print('V_0, V_avg : %f, %f' %(p['inverter.V_0'],p['inverter.V_avg']))
-        p.run()
-        print('# of fins : %f' %p['inverter.n_fins'])
-        print(p['inverter.h'], p['inverter.min_area'], p['inverter.Re'])
-        print('R_hs : %f' %p['inverter.R_hs'])
-        print('V_0, V_avg : %f, %f' %(p['inverter.V_0'],p['inverter.V_avg']))
-        p.run()
-        print('# of fins : %f' %p['inverter.n_fins'])
-        print(p['inverter.h'], p['inverter.min_area'], p['inverter.Re'])
-        print('R_hs : %f' %p['inverter.R_hs'])
-        print('V_0, V_avg : %f, %f' %(p['inverter.V_0'],p['inverter.V_avg']))
+       
