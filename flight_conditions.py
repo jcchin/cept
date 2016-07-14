@@ -91,6 +91,7 @@ if __name__ == "__main__":
     print ('Air Visc : %f Pa*s' % cu(mustar,'kg/m/s','Pa*s'))
     print ('Air Cond : %f' % p['fc.calcs.AirCond'])
     print ('Pr : %f' % p['fc.calcs.Pr'])
+    print ('Cp : %f' % cu(p['fc.amb.Fl_O:stat:Cp'],'Btu/(lbm*degR)','J/(kg*K)'))
 
     p['des_vars.alt'] = 0
     p['des_vars.Speed'] = 0
