@@ -46,7 +46,7 @@ class InverterSink(Component):
         self.add_param('V_0', 20., desc='initial average velocity guess', units='m/s')
         self.add_param('h_0', 20., desc='initial average velocity guess', units='W/(m**2*K)')
         self.add_param('rho', 1.158128, desc='density of air', units='kg/m**3')
-        self.add_param('fin_gap', 0.001, desc='Min spacing between fins', units='m')
+        self.add_param('fin_gap', 0.001, desc='spacing between fins', units='m')
         self.add_param('mu', 0.000018, desc='dynamic viscosity',units='Pa*s')
         self.add_param('Cp', 1004.088235, desc='specific heat at altitude', units='J/(kg*K)')
         self.add_param('k_air', 0.026726, desc='thermal conductivity of air', units='W/(m*K')
@@ -119,7 +119,7 @@ class InverterSink(Component):
         u['f'] = (24.-32.527*lamb + 46.721*lamb**2 - 40.829*lamb**3 + 22.954*lamb**4 - 6.089*lamb**5 ) / Re
         u['f_app'] = sqrt(((3.44/sqrt(u['Lstar']))**2 + (u['f']*Re)**2))/Re
         rho = p['rho']
-        u['dP1'] = (u['Kc']+4*u['f_app']*(l/Dh)+u['Ke'])*rho*(V**2)/2.
+        u['dP1'] = ((u['Kc']+4*u['f_app']*(l/Dh)+u['Ke'])*rho*(V**2)/2.)
         #volumetric flow rate through a single gap
         u['Q'] = (h*u['dP1']*p['fin_gap']**3)/(12*mu)
         #assumed same velocity through all
@@ -160,7 +160,7 @@ if __name__ == '__main__':
     #top.driver.add_constraint('con2.c2', lower=0.0)
     root.ln_solver = ScipyGMRES()
     root.nl_solver = NLGaussSeidel()
-    root.nl_solver.options['maxiter'] = 5
+    root.nl_solver.options['maxiter'] = 50
     # root.nl_solver.options['iprint'] = 1
     #p.print_all_convergence()
 
