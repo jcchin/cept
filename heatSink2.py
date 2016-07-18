@@ -28,15 +28,15 @@ class HeatSink(Component):
         self.add_param('case_thickness', 0.001, desc='thickness of thermal grease', units='m')
         self.add_param('k_case', 150., desc='Thermal conductivity of grease', units='W/(m*K)')
         #self.add_param('h_0', 20., desc='initial average velocity guess', units='W/(m**2*K)')
-        #self.add_param('rho', 1.158128, desc='density of air', units='kg/m**3')
+        self.add_param('rho', 1.158128, desc='density of air', units='kg/m**3')
         self.add_param('mu', 0.000018, desc='dynamic viscosity',units='Pa*s')
         self.add_param('nu', 0.0000168, desc='kinematic viscosity',units='m**2/s')
         self.add_param('Cp', 1004.088235, desc='specific heat at altitude', units='J/(kg*K)')
         self.add_param('k_air', 0.026726, desc='thermal conductivity of air', units='W/(m*K)')
         self.add_param('k_fin', 200.0, desc='thermal conductivity of aluminum', units='W/(m*K)' )
         self.add_param('flag', 0.0, desc='test flag, to set values')
-        #self.add_output('Dh', 1.0, desc='hydraulic diameter', units='m')
-        #self.add_output('Lstar', 1.0, desc='characteristic length', units='m')
+        self.add_output('Dh', 1.0, desc='hydraulic diameter', units='m')
+        self.add_output('Lstar', 1.0, desc='characteristic length', units='m')
         #self.add_output('sigma', 1.0, desc='ratio of flow channel areas to approaching flow area')
         #self.add_output('Kc', 1.0, desc='pressure loss coefficient due to sudden flow compression')
         #self.add_output('Ke', 1.0, desc='pressure loss coefficient due to sudden flow expansion')
@@ -98,11 +98,22 @@ class HeatSink(Component):
             Pr = u['Pr'] = 0.708 #force to test case value
 
         u['Nu'] = 2.656*gam_e*Pr**(1./3.) #non-ducted
+        ducted = False
+        if ducted:
+            u['Nu'] = 8.235 # http://www.dtic.mil/dtic/tr/fulltext/u2/a344846.pdf
         u['alpha'] = sqrt(p['k_fin']/(p['k_air']*u['Nu']))
 
-        u['fin_gap'] = 2.*gam_e*sqrt((p['nu']*p['sink_l'])/p['V_in'])
+        V = p['V_in']
+        b = u['fin_gap'] = 2.*gam_e*sqrt((p['nu']*p['sink_l'])/V)
         lam = u['lambda'] = H/(u['fin_gap']*u['alpha'])
         u['omega'] = H / (p['k_fin'] * Abase)
+
+
+        Dh = u['Dh'] = 2.*b
+        mu = p['mu']
+        l = p['sink_l']
+        Re = u['Re'] = (p['rho']*V*b*b)/(mu*l)
+        u['Lstar'] = l/(Dh*Re*Pr)
 
         u['R_lossless'] = u['omega']*lam**-2.
         u['zeta_global'] = 2.*lam + 1.
@@ -169,6 +180,8 @@ if __name__ == '__main__':
         print('V_in : %f' %p['hs.V_in'])
         print('Nu : %f' %p['hs.Nu'])
         print('Pr : %f' %p['hs.Pr'])
+        print('Re : %f' %p['hs.Re'])
+        print('L* : %f' %p['hs.Lstar'])
         print('alpha : %f' %p['hs.alpha'])
         print('fin height: %f' %p['hs.fin_h'])
         print('lambda : %f' %p['hs.lambda'])
