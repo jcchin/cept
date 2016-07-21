@@ -16,15 +16,15 @@ class HeatSink(Component):
         self.add_param('Inv_eff', 0.98, desc='inverter efficiency')
         self.add_param('T_air', 47., desc='Cooling Air Temp', units='degC')
         self.add_param('T_max', 80., desc='Maximum Electronics Temp', units='degC')
-        self.add_param('sink_w', .192, desc='Heat Sink Base Width', units='m')
-        self.add_param('sink_l', .160, desc='Heat Sink Base Length', units='m')
+        self.add_param('sink_w', .190, desc='Heat Sink Base Width', units='m')
+        self.add_param('sink_l', .100, desc='Heat Sink Base Length', units='m')
         self.add_param('sink_h', .002, desc='Heat Sink Base Height', units='m')
         self.add_param('avail_h', 0.1, desc='maximum available height for heat sink', units='m')
         self.add_param('gamm_eff', 1.8, desc='boundary layer thickness parameter, dimensionless')
         self.add_param('V_in', 20., desc='initial velocity', units='m/s')
         self.add_param('fin_h2', 0.031, desc='user defined fin height', units='m' )
         self.add_param('grease_thickness', 0.0001, desc='thickness of thermal grease', units='m')
-        self.add_param('k_grease', 0.79, desc='Thermal conductivity of grease', units='W/(m*K)')
+        self.add_param('k_grease', 1.5, desc='Thermal conductivity of grease', units='W/(m*K)')
         self.add_param('case_thickness', 0.001, desc='thickness of thermal grease', units='m')
         self.add_param('k_case', 150., desc='Thermal conductivity of grease', units='W/(m*K)')
         #self.add_param('h_0', 20., desc='initial average velocity guess', units='W/(m**2*K)')
@@ -37,12 +37,12 @@ class HeatSink(Component):
         self.add_param('flag', 0.0, desc='test flag, to set values')
         self.add_output('Dh', 1.0, desc='hydraulic diameter', units='m')
         self.add_output('Lstar', 1.0, desc='characteristic length', units='m')
-        #self.add_output('sigma', 1.0, desc='ratio of flow channel areas to approaching flow area')
-        #self.add_output('Kc', 1.0, desc='pressure loss coefficient due to sudden flow compression')
-        #self.add_output('Ke', 1.0, desc='pressure loss coefficient due to sudden flow expansion')
-        #self.add_output('f', 1.0, desc='friction factor for fully developed laminar flow, based on fin aspect ratio')
-        #self.add_output('f_app', 1.0, desc='apparent friction factor for hydrodynamically developing \
-        #                        laminar flow, based on f')
+        self.add_output('sigma', 1.0, desc='ratio of flow channel areas to approaching flow area')
+        self.add_output('Kc', 1.0, desc='pressure loss coefficient due to sudden flow compression')
+        self.add_output('Ke', 1.0, desc='pressure loss coefficient due to sudden flow expansion')
+        self.add_output('f', 1.0, desc='friction factor for fully developed laminar flow, based on fin aspect ratio')
+        self.add_output('f_app', 1.0, desc='apparent friction factor for hydrodynamically developing \
+                                laminar flow, based on f')
         # material props
         #self.add_param('case_t', 150., desc='thermal conductivity of the casing, Al-6061-T6', units='W/(m*K)' )
         #self.add_param('fin_t',220., desc='thermal conductivity of the fins, Al-1100', units='W/(m*K)' )
@@ -59,7 +59,7 @@ class HeatSink(Component):
         self.add_output('fin_h', .032, desc='Fin height', units='m')
         # Pressure drop calcs
         #self.add_output('Q', 10., desc='volumetric flow rate', units='m**3/s')
-        #self.add_output('dP1', 1.0, desc='pressure drop based on friction', units='Pa')
+        self.add_output('dP', 1.0, desc='pressure drop based on friction', units='Pa')
         #self.add_output('dP2', 0.0, desc='pressure drop based on velocity', units='Pa')
         #self.add_output('V_out', 5., desc='exit velocity', units='m/s')
         self.add_output('lambda', 2., desc='dimensionless channel height')
@@ -98,7 +98,7 @@ class HeatSink(Component):
             Pr = u['Pr'] = 0.708 #force to test case value
 
         u['Nu'] = 2.656*gam_e*Pr**(1./3.) #non-ducted
-        ducted = False
+        ducted = True
         if ducted:
             u['Nu'] = 8.235 # http://www.dtic.mil/dtic/tr/fulltext/u2/a344846.pdf
         u['alpha'] = sqrt(p['k_fin']/(p['k_air']*u['Nu']))
@@ -130,6 +130,20 @@ class HeatSink(Component):
         u['R_grease'] = p['case_thickness']/(p['k_case']*Abase)
 
         u['R_tot'] = u['R_case'] + u['R_grease'] + u['R_thin']
+
+        #pressure drop calcs
+        s = u['sigma'] = 1.- (u['n_fins']*u['fin_w'])/p['sink_w']
+        u['Ke'] = (1.-s**2.)**2.
+        u['Kc'] = 0.42 * (1-s**2)
+        Lstar2 = (l/Dh)/Re
+        lamb = u['lambda'] = b/H
+        u['f'] = (24.-32.527*lamb + 46.721*lamb**2. - 40.829*lamb**3. + 22.954*lamb**4 - 6.089*lamb**5 ) / Re
+        u['f_app'] = sqrt(((3.44/sqrt(Lstar2))**2. + (u['f']*Re)**2.))/Re
+        rho = p['rho']
+        u['dP'] = ((u['Kc']+4.*u['f_app']*(l/Dh)+u['Ke'])*rho*(V**2.)/2.)
+
+        u['h'] = u['Nu']*p['k_air']/Dh
+        print(u['h'],(1./(Abase*u['R_thin'])))
 
 if __name__ == '__main__':
     from openmdao.core.problem import Problem
@@ -194,11 +208,15 @@ if __name__ == '__main__':
         print('fin thickness: %f' % p['hs.fin_w'])
         print('fin gap: %f' % p['hs.fin_gap'])
         print('R_thin: %f' % p['hs.R_thin'])
+        print('R_tot: %f' % p['hs.R_tot'])
+        print('Pressure Drop %f' % p['hs.dP'])
+        print('h %f' % p['hs.h'])
 
     p.run()
     print('R_max: %f' % (p['hs.R_max']-p['hs.R_case']-p['hs.R_grease']))
     print('Arthur Height')
     printstuff()
+    quit()
 
     from mpl_toolkits.mplot3d import Axes3D
     import matplotlib.pyplot as plt
@@ -219,8 +237,12 @@ if __name__ == '__main__':
             Z[j,i] = p['hs.R_tot']
             Za[j,i] = p['hs.fin_gap']
             Zb[j,i] = p['hs.fin_w']
-        print(p['hs.fin_gap'])
 
+            if (vel == 20. and ht == 0.035000000000000024):
+                print('Vel, H-->', vel, ht, ' R_tot, Fin_gap, Fin_W')
+                print(vel,ht,p['hs.R_tot'],p['hs.fin_gap'],p['hs.fin_w'],p['hs.n_fins'])
+                print
+    quit()
     # Assign colors based off some user-defined condition
     COLORS = empty(X.shape, dtype=str)
     COLORS[:,:] = 'r'
