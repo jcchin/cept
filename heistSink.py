@@ -46,8 +46,8 @@ class NacelleWallTemp(Component):
 
         #--Inputs--
         #Parameters/Design Variables
-        self.add_param('radius_outer_tube', 0.08, units='m', desc='tube outer radius') #7.3ft
-        self.add_param('length_tube', 0.4, units='m', desc='Length of entire Hyperloop') #300 miles, 1584000ft
+        self.add_param('radius_outer_tube', 0.08, units='m', desc='tube outer radius')
+        self.add_param('length_tube', 0.3, units='m', desc='Length of entire nacelle')
         self.add_param('temp_boundary', 322.0, units='K', desc='Average Temperature of the tube wall') #
         self.add_param('temp_outside_ambient', 305.6, units='K', desc='Average Temperature of the outside air') #
         self.add_param('heat_inverter', 220, units='W', desc='Heating Due to a Single Pods') #
@@ -72,7 +72,7 @@ class NacelleWallTemp(Component):
         self.add_output('Gr', 12730351223., desc='Grashof #') #
         self.add_output('Ra', 8996312085., desc='Rayleigh #') #
         self.add_output('Nu', 232.4543713, desc='Nusselt #') #
-        self.add_output('k', 0.02655, units='W/(m*K)', desc='Thermal conductivity') #
+        self.add_output('k', 0.02655, units='W/(m*K)', desc='Thermal conductivity of air') #
         self.add_output('h', 0.845464094, units='W/((m**2)*K)', desc='Heat Radiated to the outside') #
         self.add_output('area_convection', 1.0, units='m**2', desc='Convection Area') #
         #Natural Convection
@@ -147,6 +147,10 @@ class NacelleWallTemp(Component):
         u['q_total_out'] = u['q_rad_tot'] + u['total_q_nat_conv']
         u['q_total_in'] = u['q_total_solar'] + p['heat_inverter']
 
+        print(u['q_total_out'], 'tot out')
+        print(u['q_total_in'], 'tot in')
+
+
 class Assembly(Group):
     """A top level assembly to connect the two components"""
 
@@ -182,8 +186,8 @@ if __name__ == "__main__":
 
     dvars = (
         ('radius', 0.08), #desc='Tube out diameter' #7.3ft
-        ('length_tube', 0.4),  #desc='Length of entire Hyperloop') #300 miles, 1584000ft
-        ('temp_boundary',340), #desc='Average Temperature of the tube') #
+        ('length_tube', 0.4),  #desc='Length of entire nacelle
+        ('temp_boundary',340), #desc='Average Temperature of the nacelle') #
         ('temp_outside_ambient',305.6) #desc='Average Temperature of the outside air
         )
 
