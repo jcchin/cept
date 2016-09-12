@@ -15,25 +15,26 @@ class HeatSink(Component):
         self.add_param('InvPwr', 45000.0, desc='total power through the inverter', units='W')
         self.add_param('Inv_eff', 0.98, desc='inverter efficiency')
         self.add_param('T_air', 47., desc='Cooling Air Temp', units='degC')
-        self.add_param('T_max', 80., desc='Maximum Electronics Temp', units='degC')
+        self.add_param('T_max', 85., desc='Maximum Electronics Temp', units='degC')
         self.add_param('sink_w', .190, desc='Heat Sink Base Width', units='m')
         self.add_param('sink_l', .100, desc='Heat Sink Base Length', units='m')
         self.add_param('sink_h', .002, desc='Heat Sink Base Height', units='m')
         self.add_param('avail_h', 0.1, desc='maximum available height for heat sink', units='m')
         self.add_param('gamm_eff', 1.8, desc='boundary layer thickness parameter, dimensionless')
-        self.add_param('V_in', 20., desc='initial velocity', units='m/s')
-        self.add_param('fin_h2', 0.031, desc='user defined fin height', units='m' )
+        self.add_param('fin_h2', 0.035, desc='user defined fin height', units='m' )
         self.add_param('grease_thickness', 0.0001, desc='thickness of thermal grease', units='m')
         self.add_param('k_grease', 1.5, desc='Thermal conductivity of grease', units='W/(m*K)')
         self.add_param('case_thickness', 0.001, desc='thickness of thermal grease', units='m')
-        self.add_param('k_case', 150., desc='Thermal conductivity of grease', units='W/(m*K)')
+        self.add_param('k_case', 200., desc='Thermal conductivity of grease', units='W/(m*K)')
+        self.add_param('cfm', 70.0, desc='flow rate in cubic feet per minute', units='ft**3/min')
+
         #self.add_param('h_0', 20., desc='initial average velocity guess', units='W/(m**2*K)')
         self.add_param('rho', 1.158128, desc='density of air', units='kg/m**3')
         self.add_param('mu', 0.000018, desc='dynamic viscosity',units='Pa*s')
         self.add_param('nu', 0.0000168, desc='kinematic viscosity',units='m**2/s')
         self.add_param('Cp', 1004.088235, desc='specific heat at altitude', units='J/(kg*K)')
         self.add_param('k_air', 0.026726, desc='thermal conductivity of air', units='W/(m*K)')
-        self.add_param('k_fin', 200.0, desc='thermal conductivity of aluminum', units='W/(m*K)' )
+        self.add_param('k_fin', 230.0, desc='thermal conductivity of aluminum', units='W/(m*K)' ) # 230 in COMSOL
         self.add_param('flag', 0.0, desc='test flag, to set values')
         self.add_output('Dh', 1.0, desc='hydraulic diameter', units='m')
         self.add_output('Lstar', 1.0, desc='characteristic length', units='m')
@@ -46,6 +47,7 @@ class HeatSink(Component):
         # material props
         #self.add_param('case_t', 150., desc='thermal conductivity of the casing, Al-6061-T6', units='W/(m*K)' )
         #self.add_param('fin_t',220., desc='thermal conductivity of the fins, Al-1100', units='W/(m*K)' )
+        self.add_output('V_in', 7., desc='initial velocity', units='m/s')
         self.add_output('h', 20., desc='fin heat transfer coefficient', units='W/(m**2*K)')
         self.add_output('Re', 10., desc='Reynolds #')
         self.add_output('Pr', 10., desc='Prandtl #')
@@ -76,7 +78,6 @@ class HeatSink(Component):
         self.add_output('R_case', 0.0001, desc='inverter case thermal resistance', units='degC/W')
         self.add_output('R_grease', 0.004, desc='grease thermal resistance', units='degC/W')
 
-
     def solve_nonlinear(self, p, u, r):
 
         flag = p['flag']
@@ -103,7 +104,9 @@ class HeatSink(Component):
             u['Nu'] = 8.235 # http://www.dtic.mil/dtic/tr/fulltext/u2/a344846.pdf
         u['alpha'] = sqrt(p['k_fin']/(p['k_air']*u['Nu']))
 
-        V = p['V_in']
+        V = u['V_in']  = cu(p['cfm']/cu((p['sink_w']*H-(H*u['n_fins']*u['fin_w'])),'m**2','ft**2'),'ft/min','m/s')
+        print('V',V)
+
         b = u['fin_gap'] = 2.*gam_e*sqrt((p['nu']*p['sink_l'])/V)
         lam = u['lambda'] = H/(u['fin_gap']*u['alpha'])
         u['omega'] = H / (p['k_fin'] * Abase)
@@ -125,11 +128,14 @@ class HeatSink(Component):
         u['fin_w'] = H/u['alpha'] # actual ideal will be a bit smaller, accurate with small lambda
         u['n_fins'] = p['sink_w']/(u['fin_w']+u['fin_gap'])
 
-        u['R_case'] = p['grease_thickness']/(p['k_grease']*Abase)
+        u['R_case'] = p['case_thickness']/(p['k_case']*Abase)
 
-        u['R_grease'] = p['case_thickness']/(p['k_case']*Abase)
+        u['R_grease'] = p['grease_thickness']/(p['k_grease']*Abase)
 
-        u['R_tot'] = u['R_case'] + u['R_grease'] + u['R_thin']
+        if lam >=1:
+            u['R_tot'] = u['R_case'] + u['R_grease'] + u['R_global']
+        else:
+            u['R_tot'] = u['R_case'] + u['R_grease'] + u['R_thin']
 
         #pressure drop calcs
         s = u['sigma'] = 1.- (u['n_fins']*u['fin_w'])/p['sink_w']
@@ -143,7 +149,8 @@ class HeatSink(Component):
         u['dP'] = ((u['Kc']+4.*u['f_app']*(l/Dh)+u['Ke'])*rho*(V**2.)/2.)
 
         u['h'] = u['Nu']*p['k_air']/Dh
-        print(u['h'],(1./(Abase*u['R_thin'])))
+        #print(u['h'],(1./(Abase*u['R_thin'])))
+
 
 if __name__ == '__main__':
     from openmdao.core.problem import Problem
@@ -216,33 +223,36 @@ if __name__ == '__main__':
     print('R_max: %f' % (p['hs.R_max']-p['hs.R_case']-p['hs.R_grease']))
     print('Arthur Height')
     printstuff()
-    quit()
+    #quit()
 
     from mpl_toolkits.mplot3d import Axes3D
     import matplotlib.pyplot as plt
     # Some sample data
-    x_side = arange(4., 24., .25) # velocity
-    y_side = arange(0.01, 0.06, 0.000625)
+    #x_side = arange(4., 24., .25) # velocity
+    x_side = arange(30., 120., 2.5) # velocity
+    y_side = arange(0.015, 0.06, 0.000625)
     X, Y = meshgrid(x_side,y_side)
     Z = zeros(np.shape(X))
     Za = zeros(np.shape(X))
     Zb = zeros(np.shape(X))
 
     p['hs.flag'] = 2
-    for i,vel in enumerate(x_side):
+    for i,cfm in enumerate(x_side):
         for j,ht in enumerate(y_side):
-            p['hs.V_in'] = vel
+            p['hs.cfm'] = cfm
             p['hs.fin_h2'] = ht
+            p.run()
+            p.run()
             p.run()
             Z[j,i] = p['hs.R_tot']
             Za[j,i] = p['hs.fin_gap']
             Zb[j,i] = p['hs.fin_w']
 
-            if (vel == 20. and ht == 0.035000000000000024):
-                print('Vel, H-->', vel, ht, ' R_tot, Fin_gap, Fin_W')
-                print(vel,ht,p['hs.R_tot'],p['hs.fin_gap'],p['hs.fin_w'],p['hs.n_fins'])
+            if (cfm == 70. and ht == 0.035000000000000024):
+                print('CFM, H-->', cfm, ht, ' R_tot, Fin_gap, Fin_W, N_fins')
+                print(cfm,ht,p['hs.R_tot'],p['hs.fin_gap'],p['hs.fin_w'],p['hs.n_fins'])
                 print
-    quit()
+    #quit()
     # Assign colors based off some user-defined condition
     COLORS = empty(X.shape, dtype=str)
     COLORS[:,:] = 'r'
@@ -254,7 +264,7 @@ if __name__ == '__main__':
     ax = fig.gca(projection='3d')
     surf = ax.plot_surface(X, Y, Z, facecolors=COLORS, rstride=1, cstride=1,
             linewidth=0)
-    ax.set_xlabel('Velocity (m/s)')
+    ax.set_xlabel('CFM (ft^3/min)')
     ax.set_ylabel('Fin Height (m)')
     ax.set_zlabel('Thermal Resistance')
     plt.show()
@@ -263,7 +273,7 @@ if __name__ == '__main__':
     ax = fig.gca(projection='3d')
     surf = ax.plot_surface(X, Y, Za, facecolors=COLORS, rstride=1, cstride=1,
             linewidth=0)
-    ax.set_xlabel('Velocity (m/s)')
+    ax.set_xlabel('CFM (ft^3/min)')
     ax.set_ylabel('Fin Height (m)')
     ax.set_zlabel('fin gap')
     plt.show()
@@ -272,7 +282,7 @@ if __name__ == '__main__':
     ax = fig.gca(projection='3d')
     surf = ax.plot_surface(X, Y, Zb, facecolors=COLORS, rstride=1, cstride=1,
             linewidth=0)
-    ax.set_xlabel('Velocity (m/s)')
+    ax.set_xlabel('CFM (ft^3/min)')
     ax.set_ylabel('Fin Height (m)')
     ax.set_zlabel('Fin thickness')
     plt.show()
