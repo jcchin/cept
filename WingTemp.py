@@ -71,6 +71,12 @@ if __name__ == '__main__':
     p.run()
     print('             10C   |  %3.1f degC  %3.1f degF ' % (cu(p['comp.plateTemp'],'degK','degC'), cu(p['comp.plateTemp'],'degK','degF')))
 
+    p['comp.skyTemp'] = 273+10
+    p['comp.absorb'] = 0.2
+    p.run()
+    print('')
+    print('absorb=0.2,  10C   |  %3.1f degC  %3.1f degF ' % (cu(p['comp.plateTemp'],'degK','degC'), cu(p['comp.plateTemp'],'degK','degF')))
+
 # NASA TM 2008 215633 Table 4-8
 #              |  Design High Solar Radiation |
 #   Time of Day|   BTU/ft^2/hr  |    W/m^2    |
