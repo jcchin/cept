@@ -27,15 +27,19 @@ class TempBalance(Component):
     def __init__(self):
         super(TempBalance, self).__init__()
 
-        self.add_param('q_total_out', 28., units='W', desc='Total Heat Released via Radiation and Natural Convection') #
-        self.add_param('q_total_in', 280., units='W', desc='Total Heat Absorbed/Added via Pods and Solar Absorption') #
-        self.add_state('temp_boundary', val=322.0)
+        self.add_param('q_total_out', 230., units='W', desc='Total Heat Released via Radiation and Natural Convection') #
+        self.add_param('q_total_in', 230., units='W', desc='Total Heat Absorbed/Added via Pods and Solar Absorption') #
+        self.add_state('temp_boundary', val=322.0, units="K")
 
         self.deriv_options['type'] = 'fd'
 
     def solve_nonlinear(self, p, u, r):
+        pass
 
-        r['temp_boundary'] = (p['q_total_out'] - p['q_total_in'])/p['q_total_out']
+    def apply_nonlinear(self, p, u, r):
+
+
+        r['temp_boundary'] = (p['q_total_out'] - p['q_total_in'])
 
 
 class NacelleWallTemp(Component):
@@ -50,7 +54,7 @@ class NacelleWallTemp(Component):
         self.add_param('length_tube', 0.3, units='m', desc='Length of entire nacelle')
         self.add_param('temp_boundary', 322.0, units='K', desc='Average Temperature of the tube wall') #
         self.add_param('temp_outside_ambient', 305.6, units='K', desc='Average Temperature of the outside air') #
-        self.add_param('heat_inverter', 220, units='W', desc='Heating Due to a Single Pods') #
+        self.add_param('heat_inverter', 220., units='W', desc='Heating Due to a Single Pods') #
 
         #constants
         self.add_param('solar_insolation', 100., units='W/m**2', desc='solar irradiation at sea level on a clear day') #
@@ -147,9 +151,7 @@ class NacelleWallTemp(Component):
         u['q_total_out'] = u['q_rad_tot'] + u['total_q_nat_conv']
         u['q_total_in'] = u['q_total_solar'] + p['heat_inverter']
 
-        print(u['q_total_out'], 'tot out')
-        print(u['q_total_in'], 'tot in')
-
+        # print("bar", u['q_total_out'], u['q_total_in'], p['temp_boundary'])
 
 class Assembly(Group):
     """A top level assembly to connect the two components"""
@@ -171,11 +173,12 @@ class Assembly(Group):
         # self.nl_solver.options['maxiter'] = 50
         self.nl_solver.options['maxiter'] = 10
 
-        self.ln_solver = ScipyGMRES()
-        self.ln_solver.options['atol'] = 1e-6
-        self.ln_solver.options['maxiter'] = 100
-        self.ln_solver.options['restart'] = 100
+        # self.ln_solver = ScipyGMRES()
+        # self.ln_solver.options['atol'] = 1e-6
+        # self.ln_solver.options['maxiter'] = 100
+        # self.ln_solver.options['restart'] = 100
 
+        self.ln_solver = DirectSolver()
 #run stand-alone component
 if __name__ == "__main__":
 
@@ -187,28 +190,28 @@ if __name__ == "__main__":
     dvars = (
         ('radius', 0.08), #desc='Tube out diameter' #7.3ft
         ('length_tube', 0.4),  #desc='Length of entire nacelle
-        ('temp_boundary',340), #desc='Average Temperature of the nacelle') #
+        ('temp_boundary',340.), #desc='Average Temperature of the nacelle') #
         ('temp_outside_ambient',305.6) #desc='Average Temperature of the outside air
         )
 
     prob.root.add('vars', IndepVarComp(dvars))
 
-    prob.setup()
 
     # from openmdao.api import view_model
     # view_model(prob)
     # exit()
 
     prob.root.connect('vars.radius','fs.radius_outer_tube')
-    prob.root.connect('vars.length_tube','fs.length_tube')
-    prob.root.connect('vars.temp_boundary','fs.temp_boundary')
-    prob.root.connect('vars.temp_outside_ambient','fs.temp_outside_ambient')
+    prob.root.connect('vars.length_tube','fs.tm.length_tube')
+    prob.root.connect('vars.temp_outside_ambient','fs.tm.temp_outside_ambient')
+
+
+    prob.setup()
 
     prob.run()
 
-    prob.root.list_states()
 
-    #print "temp_boundary: ", prob['root.tm.tmp_balance']
+    print "temp_boundary: ", prob['fs.tmp_balance.temp_boundary']
 
     # print "-----Completed Tube Heat Flux Model Calculations---"
     # print ""
