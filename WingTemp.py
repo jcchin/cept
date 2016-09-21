@@ -13,7 +13,7 @@ class WingTemp(Component):
         self.add_param('emiss', 0.9, desc='Emissivity')
         self.add_param('skyTemp', 239.0, desc='Sky Temperature', units='K')
         self.add_param('airTemp', 318.0, desc='Air Temperature', units='K')
-        self.add_param('area', 1.0, desc='Area', units='m**2')
+        self.add_param('area', 6.0, desc='Area', units='m**2')
 
         self.add_state('plateTemp', 500.00, desc='Plate Temperature', units='K')
         self.add_output('sol_heat', 458.0, desc='Solar Heat', units='W')
