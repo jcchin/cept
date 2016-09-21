@@ -92,6 +92,7 @@ class PowerBus(Component):
 
         u['A_dL'] = p['wireD']*pi
         turbulent = 0
+        # table 7-2 pg 253 (Christie photocopy)
         if turbulent:
             u['deltaT2'] = (p['QperL']*(1./u['A_dL'])*1./1.24)**(1/1.33)
         else:
