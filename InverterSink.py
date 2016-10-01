@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 from openmdao.api import Component, ScipyGMRES, NLGaussSeidel, IndepVarComp, ScipyOptimizer
 from openmdao.units.units import convert_units as cu
 from numpy import tanh, arange
