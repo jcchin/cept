@@ -94,9 +94,9 @@ class PowerBus(Component):
         # Plot Transient
         u['time'] = list(accumulate([
             0., p['to_period'],
-            1., p['peak_period'] - 1,
-            1., p['climb_period'] - 1,
-            1., p['cruise_period'] - 1,
+            0., p['peak_period'],
+            0., p['climb_period'],
+            0., p['cruise_period'],
         ]))  # accumulate integrates the durations into a cumulative sum
 
         toc, pc, cc, crc = u['to_current'], u['peak_current'], u['climb_current'], u['cruise_current']
