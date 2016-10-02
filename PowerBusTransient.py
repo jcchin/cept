@@ -1,6 +1,6 @@
-from openmdao.api import Component, ScipyGMRES, Newton, IndepVarComp
-from openmdao.units.units import convert_units as cu
+from openmdao.api import Component
 from math import pi
+
 
 class PowerBus(Component):
     def __init__(self):
@@ -9,10 +9,10 @@ class PowerBus(Component):
         self.deriv_options['type'] = "fd"
 
         self.add_param('busVoltage', 416., desc='lowest battery operating voltage', units='V')
-        self.add_param('to_pwr', 45000./10., desc='take-off power per bus, two buses per wing', units='W')
-        self.add_param('peak_pwr', 75000./10., desc='peak power', units='W')
-        self.add_param('climb_pwr', 30000./10., desc='climb power per bus.. (total of 60kW motor)', units='W')
-        self.add_param('cruise_pwr', 20000./10., desc='cruise/climb power bus', units='W')
+        self.add_param('to_pwr', 45000. / 10., desc='take-off power per bus, two buses per wing', units='W')
+        self.add_param('peak_pwr', 75000. / 10., desc='peak power', units='W')
+        self.add_param('climb_pwr', 30000. / 10., desc='climb power per bus.. (total of 60kW motor)', units='W')
+        self.add_param('cruise_pwr', 20000. / 10., desc='cruise/climb power bus', units='W')
         self.add_param('efficiency', 0.9, desc='product of motor and inverter efficiency')
 
         self.add_param('to_period', 120., desc='take-off period, e.g. 45KW for 2 min', units='s')
@@ -29,13 +29,13 @@ class PowerBus(Component):
         # insulated wires bundled together)
         # Altitude de-rating Not Applicable below 60,000ft
 
-        #AperStrand (mm^2), Resistance (ohms/km), A40 = current rating at 40degC
-        cable_data = [\
-        {'Wire':1, 'strands':779, 'AWG':30, 'AperStand':0.0509, 'Resistance':0.4056, 'A40':293, 'A71':270},
-        {'Wire':2, 'strands':665, 'AWG':30, 'AperStand':0.0509, 'Resistance':0.5114, 'A40':255, 'A71':230},
-        {'Wire':4, 'strands':133, 'AWG':25, 'AperStand':0.1624, 'Resistance':0.8132, 'A40':190, 'A71':170},
-        {'Wire':10, 'strands':1, 'AWG':10, 'AperStand':5.26, 'Resistance':3.276, 'A40':28.8, 'A71':28.8}]
-
+        # AperStrand (mm^2), Resistance (ohms/km), A40 = current rating at 40degC
+        cable_data = [
+            {'Wire': 1, 'strands': 779, 'AWG': 30, 'AperStand': 0.0509, 'Resistance': 0.4056, 'A40': 293, 'A71': 270},
+            {'Wire': 2, 'strands': 665, 'AWG': 30, 'AperStand': 0.0509, 'Resistance': 0.5114, 'A40': 255, 'A71': 230},
+            {'Wire': 4, 'strands': 133, 'AWG': 25, 'AperStand': 0.1624, 'Resistance': 0.8132, 'A40': 190, 'A71': 170},
+            {'Wire': 10, 'strands': 1, 'AWG': 10, 'AperStand': 5.26, 'Resistance': 3.276, 'A40': 28.8, 'A71': 28.8}
+        ]
 
         self.add_param('cable_data', cable_data)
 
@@ -55,16 +55,18 @@ class PowerBus(Component):
 
         self.add_param('fg_t', 0.1, desc='fiberglass duct thickness', units='cm')
 
-        #todo lookup function to calc wire area given stand sizes
+        # todo lookup function to calc wire area given stand sizes
 
         self.add_param('wireD', 0.0082, desc='Wire Diameter', units='m')
 
         self.add_param('n_hl_motors', 6., desc='Number of High Lift Motors')
         self.add_param('hlpower', 10000., desc='distributed motor power during take-off', units='W')
 
-        self.add_output('deltaT', 79., desc='temperature difference between rated temperature and actual free air temperature', units='degC')
+        self.add_output('deltaT', 79.,
+                        desc='temperature difference between rated temperature and actual free air temperature',
+                        units='degC')
         self.add_output('to_current', 0., units='A')
-        self.add_output('peak_current',0., units='A')
+        self.add_output('peak_current', 0., units='A')
         self.add_output('climb_current', 0., units='A')
         self.add_output('cruise_current', 0., units='A')
 
@@ -74,26 +76,26 @@ class PowerBus(Component):
         self.add_output('deltaT2', 127., desc='wire temp rise above the environment', units='degC')
         self.add_output('wireTemp', 167., desc='wire Temperature', units='degC')
 
-        self.add_output('cable_out',[0.])
+        self.add_output('cable_out', [0.])
         self.add_output('hl_current', 160., desc='current for all motors on one bus', units='A')
 
     def solve_nonlinear(self, p, u, r):
-        u['to_current'] = p['to_pwr']/p['efficiency']/p['busVoltage']
-        u['peak_current'] = p['peak_pwr']/p['efficiency']/p['busVoltage']
-        u['climb_current'] = p['climb_pwr']/p['efficiency']/p['busVoltage']
-        u['cruise_current'] = p['cruise_pwr']/p['efficiency']/p['busVoltage']
-        u['deltaT'] = p['Trating']-p['Tambient']
+        u['to_current'] = p['to_pwr'] / p['efficiency'] / p['busVoltage']
+        u['peak_current'] = p['peak_pwr'] / p['efficiency'] / p['busVoltage']
+        u['climb_current'] = p['climb_pwr'] / p['efficiency'] / p['busVoltage']
+        u['cruise_current'] = p['cruise_pwr'] / p['efficiency'] / p['busVoltage']
+        u['deltaT'] = p['Trating'] - p['Tambient']
 
         print(u['peak_current'])
         # Plot Transient
-        time = [0.]                                 # 0
-        time.append(time[0]+p['to_period'])    # 1
-        time.append(time[1]+1.)                     # 2
-        time.append(time[1]+p['peak_period'])  # 3
-        time.append(time[3]+1.)                     # 4
-        time.append(time[3]+p['climb_period']) # 5
-        time.append(time[5]+1.)                     # 6
-        time.append(time[5]+p['cruise_period'])# 7
+        time = [0.]  # 0
+        time.append(time[0] + p['to_period'])  # 1
+        time.append(time[1] + 1.)  # 2
+        time.append(time[1] + p['peak_period'])  # 3
+        time.append(time[3] + 1.)  # 4
+        time.append(time[3] + p['climb_period'])  # 5
+        time.append(time[5] + 1.)  # 6
+        time.append(time[5] + p['cruise_period'])  # 7
 
         toc, pc, cc, crc = u['to_current'], u['peak_current'], u['climb_current'], u['cruise_current']
         current = [toc, toc, pc, pc, cc, cc, crc, crc]
@@ -108,32 +110,29 @@ class PowerBus(Component):
         pc = u['peak_current']
         cd = p['cable_data']
 
-        u['fg_A'] = p['fg_t']* (4.445+4.445+1.9+1.9)  # 1.75"x0.75" w 0.375" radius removed
+        u['fg_A'] = p['fg_t'] * (4.445 + 4.445 + 1.9 + 1.9)  # 1.75"x0.75" w 0.375" radius removed
 
-        fg_heat_cap = u['fg_A']*p['cpfg'] * p['rhofg']
+        fg_heat_cap = u['fg_A'] * p['cpfg'] * p['rhofg']
 
-        for i,row in enumerate(cd):
-            row['area'] = cd[i]['strands']*cd[i]['AperStand']
-            row['heat'] = pc**2*(cd[i]['Resistance']/1000.)
+        for i, row in enumerate(cd):
+            row['area'] = cd[i]['strands'] * cd[i]['AperStand']
+            row['heat'] = pc ** 2 * (cd[i]['Resistance'] / 1000.)
             row['heat_cap'] = row['area'] * p['cpcu'] * p['rhocu']
-            row['roc'] = row['heat']/row['heat_cap']
+            row['roc'] = row['heat'] / row['heat_cap']
 
-        u['A_dL'] = p['wireD']*pi
+        u['A_dL'] = p['wireD'] * pi
         turbulent = 0
-
 
         u['QperL'] = cd[3]['heat']
         # table 7-2 pg 253 (Christie photocopy)
         if turbulent:
-            u['deltaT2'] = (u['QperL']*(1./u['A_dL'])*1./1.24)**(1/1.33)
+            u['deltaT2'] = (u['QperL'] * (1. / u['A_dL']) * 1. / 1.24) ** (1 / 1.33)
         else:
-            u['deltaT2'] = (u['QperL']*(1./u['A_dL'])*(p['wireD']**0.24)/1.32)**(1/1.25)
+            u['deltaT2'] = (u['QperL'] * (1. / u['A_dL']) * (p['wireD'] ** 0.24) / 1.32) ** (1 / 1.25)
 
-        u['wireTemp'] = u['deltaT2']+p['Tambient']
+        u['wireTemp'] = u['deltaT2'] + p['Tambient']
 
-        u['hl_current'] = p['n_hl_motors']*p['hlpower']/p['efficiency']/p['busVoltage']
-
-
+        u['hl_current'] = p['n_hl_motors'] * p['hlpower'] / p['efficiency'] / p['busVoltage']
 
 
 if __name__ == '__main__':
@@ -147,33 +146,32 @@ if __name__ == '__main__':
 
     p.setup(check=False)
 
-    #Check Case: Steady State #4AWG 200A 40C
+    # Check Case: Steady State #4AWG 200A 40C
     # p['comp.Tambient'] = 40.
     # p.run()
     # wT = p['comp.wireTemp']
     # print('Wire Temp(C): ', wT , 'Expected: 150degC', 'error %(w.r.t degK):', 100.*(wT - 150.)/(wT+273.), '%')
 
-    # #Steady State #4AWG 200A 71C
+    # Steady State #4AWG 200A 71C
     # p['comp.Tambient'] = 71.
     # p.run()
     # wT = p['comp.wireTemp']
     # print('Wire Temp(C): ', wT , 'Expected: 150degC', 'error %(w.r.t degK):', 100.*(wT - 150.)/(wT+273.), '%')
 
-    #Steady State #4AWG 120A 49C
+    # Steady State #4AWG 120A 49C
     p['comp.Tambient'] = 49.
     p.run()
     wT = p['comp.wireTemp']
-    print('Wire Temp(C): ', wT )
+    print('Wire Temp(C): ', wT)
     wT = p['comp.wireTemp']
     co = p['comp.cable_data']
-    print('Time to reach 73degC (165F) after 21A is applied:', (73-56.4)/co[3]['roc'], 'seconds')
+    print('Time to reach 73degC (165F) after 21A is applied:', (73 - 56.4) / co[3]['roc'], 'seconds')
 
     # High Lift Distributed Small Motors
 
-
     plot = 0
     if plot:
-        plt.plot(time,current)
+        plt.plot(time, current)
         plt.xlabel('Elapsed Time (sec)')
         plt.ylabel('Bus Current (A)')
         plt.title('Bus Current vs Time')
