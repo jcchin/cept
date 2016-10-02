@@ -80,6 +80,9 @@ class PowerBus(Component):
         self.add_output('cable_out', [0.])
         self.add_output('hl_current', 160., desc='current for all motors on one bus', units='A')
 
+        self.add_output('time', [0.], desc='time vector with each mission phase segmented')
+        self.add_output('current', [0.], desc='current vector integrating each mission segment')
+
     def solve_nonlinear(self, p, u, r):
         u['to_current'] = p['to_pwr'] / p['efficiency'] / p['busVoltage']
         u['peak_current'] = p['peak_pwr'] / p['efficiency'] / p['busVoltage']
@@ -89,7 +92,7 @@ class PowerBus(Component):
 
         print(u['peak_current'])
         # Plot Transient
-        time = list(accumulate([
+        u['time'] = list(accumulate([
             0., p['to_period'],
             1., p['peak_period'] - 1,
             1., p['climb_period'] - 1,
@@ -97,7 +100,7 @@ class PowerBus(Component):
         ]))  # accumulate integrates the durations into a cumulative sum
 
         toc, pc, cc, crc = u['to_current'], u['peak_current'], u['climb_current'], u['cruise_current']
-        current = [toc, toc, pc, pc, cc, cc, crc, crc]
+        u['current'] = [toc, toc, pc, pc, cc, cc, crc, crc]
 
         # In this case the SAE graph shows with a temperature difference
         # of 110C (150C-40C, i.e. rated temperature - environment temperature)
@@ -168,9 +171,9 @@ if __name__ == '__main__':
 
     # High Lift Distributed Small Motors
 
-    plot = 0
+    plot = True
     if plot:
-        plt.plot(time, current)
+        plt.plot(p['comp.time'], p['comp.current'])
         plt.xlabel('Elapsed Time (sec)')
         plt.ylabel('Bus Current (A)')
         plt.title('Bus Current vs Time')
