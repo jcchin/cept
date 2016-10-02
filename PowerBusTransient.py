@@ -1,4 +1,5 @@
 from openmdao.api import Component
+from itertools import accumulate
 from math import pi
 
 
@@ -88,14 +89,12 @@ class PowerBus(Component):
 
         print(u['peak_current'])
         # Plot Transient
-        time = [0.]  # 0
-        time.append(time[0] + p['to_period'])  # 1
-        time.append(time[1] + 1.)  # 2
-        time.append(time[1] + p['peak_period'])  # 3
-        time.append(time[3] + 1.)  # 4
-        time.append(time[3] + p['climb_period'])  # 5
-        time.append(time[5] + 1.)  # 6
-        time.append(time[5] + p['cruise_period'])  # 7
+        time = list(accumulate([
+            0., p['to_period'],
+            1., p['peak_period'] - 1,
+            1., p['climb_period'] - 1,
+            1., p['cruise_period'] - 1,
+        ]))  # accumulate integrates the durations into a cumulative sum
 
         toc, pc, cc, crc = u['to_current'], u['peak_current'], u['climb_current'], u['cruise_current']
         current = [toc, toc, pc, pc, cc, cc, crc, crc]
