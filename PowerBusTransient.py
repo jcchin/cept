@@ -165,7 +165,6 @@ if __name__ == '__main__':
     p.run()
     wT = p['comp.wireTemp']
     print('Wire Temp(C): ', wT)
-    wT = p['comp.wireTemp']
     co = p['comp.cable_data']
     print('Time to reach 73degC (165F) after 21A is applied:', (73 - 56.4) / co[3]['roc'], 'seconds')
 
