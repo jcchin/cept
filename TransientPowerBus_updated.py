@@ -5,24 +5,54 @@ import pylab
 
 
 #http://www.engineeringtoolbox.com/standard-atmosphere-d_604.html
-alt_table = [-1000,0,1000,2000,3000,4000,5000,6000,7000]
-temp_table = [49,49,8.5,2,-4.49,-10.98,-17.47,-23.96,-30.45] #21.5
-gravity_table = [9.81,9.807,9.804,9.801,9.797,9.794,9.791,9.788,9.785]
-pressure_table = [11.39,10.13,8.988,7.95,7.012,6.166,5.405,4.722,4.111]
-kin_viscosity_table = [1.35189E-05,1.46041E-05,1.58094E-05,1.714E-05,1.86297E-05,2.02709E-05,2.21076E-05,2.4163E-05,2.64576E-05]
+alt_table = [-1000,0,1000,2000,3000,4000,5000,6000,7000] # meters
+temp_table = [49,49,8.5,2,-4.49,-10.98,-17.47,-23.96,-30.45] #(21.5 @ 0 in reality, using 49 to be conservative)
+#gravity_table = [9.81,9.807,9.804,9.801,9.797,9.794,9.791,9.788,9.785]
+#pressure_table = [11.39,10.13,8.988,7.95,7.012,6.166,5.405,4.722,4.111]
+#kin_viscosity_table = [1.35189E-05,1.46041E-05,1.58094E-05,1.714E-05,1.86297E-05,2.02709E-05,2.21076E-05,2.4163E-05,2.64576E-05]
 
 # http://www.engineeringtoolbox.com/air-properties-d_156.html
-temperature_table = [-100,-50,0,20,40,60,80,100,120,140,160,180,200]
-k_table = [0.016,0.0204,0.0243,0.0257,0.0271,0.0285,0.0299,0.0314,0.0328,0.0343,0.0358,0.0372,0.0386]
-Pr_table = [0.74,0.725,0.715,0.713,0.711,0.709,0.708,0.703,0.7,0.695,0.69,0.69,0.685]
+#temperature_table = [-100,-50,0,20,40,60,80,100,120,140,160,180,200]
+#k_table = [0.016,0.0204,0.0243,0.0257,0.0271,0.0285,0.0299,0.0314,0.0328,0.0343,0.0358,0.0372,0.0386]
+#Pr_table = [0.74,0.725,0.715,0.713,0.711,0.709,0.708,0.703,0.7,0.695,0.69,0.69,0.685]
 
 #http://www.engineeringtoolbox.com/dry-air-properties-d_973.html
-temperature_alpha = [-73,-23,27,77,127]
-alpha_table = [0.00001017,0.00001567,0.00002207,0.00002918,0.00003694]
-cruise_alt = 10000 #ft
+#temperature_alpha = [-73,-23,27,77,127]
+#alpha_table = [0.00001017,0.00001567,0.00002207,0.00002918,0.00003694]
+app_alt = 304.8  # approach altitude, in meters (1000 ft)
+cruise_alt = 3048  # m, = 10000 ft
 
-time = [0, 825, 885, 1605, 1905, 2505, 2625, 2685, 2775, 2895, 3555]
-altitude = [0, 0, 304.8, cruise_alt * .3048, cruise_alt*.3048, 304.8, 0, 304.8, 304.8, 0, 0] #m
+# mission time segments
+m1 = 600  # Taxi from NASA
+m2 = 120  # TAke off checklist
+m3 = 60  # engine run up
+m4 = 30  # flight go/no-go
+m5 = 15  # ground role
+m6 = 60  # climb to 1000'
+m7 = 720  # cruise climb
+m8 = 300  # cruise
+m9 = 600  # descent to 1000'
+m10 = 120  # final approach
+m11 = 60  # go around to 1000'
+m12 = 90  # approach pattern
+m13 = 120  # final approach
+m14 = 60  # role-out turn off
+m15 = 600  # taxi to NASA
+
+m1_5 = m1+m2+m3+m4+m5
+m1_6 = m1_5+m6
+m1_7 = m1_6+m7
+m1_8 = m1_7+m8
+m1_9 = m1_8+m9
+m1_10 = m1_9+m10
+m1_11 = m1_10+m11
+m1_12 = m1_11+m12
+m1_13 = m1_12+m13
+m1_14 = m1_13+m14
+m1_15 = m1_14+m15
+
+time =     [0, m1_5,    m1_6,       m1_7,       m1_8,    m1_9, m1_10,   m1_11,   m1_12, m1_13, m1_15]
+altitude = [0,    0, app_alt, cruise_alt, cruise_alt, app_alt,     0, app_alt, app_alt,     0,     0]  # m
 
 #carbon fiber specs
 t_cf = 0.0006096 # m
@@ -145,9 +175,9 @@ for t in np.arange(0, 3555, ts):
     #     quit()
     alt = np.interp(t, time, altitude)
     T_ambient = np.interp(alt, alt_table, temp_table)
-    kinematic_viscosity = np.interp(alt, alt_table, kin_viscosity_table)
-    k_air = np.interp(T_ambient, temperature_table, k_table)
-    Pr = np.interp(T_ambient, temperature_table, Pr_table)
+    #kinematic_viscosity = np.interp(alt, alt_table, kin_viscosity_table)
+    #k_air = np.interp(T_ambient, temperature_table, k_table)
+    #Pr = np.interp(T_ambient, temperature_table, Pr_table)
 
     # CRUISE BUS
     cruise_bus_power = cruise_power/(motor_efficiency*inverter_efficiency) #kW
@@ -171,7 +201,7 @@ for t in np.arange(0, 3555, ts):
     # Temp_ROC_dep = q_prime_dep/HC
     # T_wire_dep = T_wire_dep + (ts*Temp_ROC_dep)
 
-    q_prime_in = (8*(q_prime_cruise+q_prime_dep)) 
+    q_prime_in = (8*(q_prime_cruise+q_prime_dep))
 
 
     Temp_ROC = q_prime_in/HC
@@ -179,7 +209,7 @@ for t in np.arange(0, 3555, ts):
 
     # r_cond_air = t_air/k_air
     # r_cond_cf = t_cf/k_cf
- 
+
     # T_duct = T_wire - (total_q_prime*(r_cond_cf+r_cond_air))
 
     # T_film = ((T_duct+T_ambient)/2)+273 #K
@@ -203,19 +233,19 @@ for t in np.arange(0, 3555, ts):
     #     n = 0.333
 
     # Nu = C* Ra ** n
-    
+
     h = 7.0 #W/m^2K
 
     r_conv = 1/(h)
 
     q_prime_out = np.pi * d *(T_duct-T_ambient)/r_conv
-    
+
     q_net = q_prime_in-q_prime_out
 
     Duct_temp_ROC = q_net/(HC)
     T_duct = T_duct + (ts*Duct_temp_ROC)
 
-    
+
 
 
 
