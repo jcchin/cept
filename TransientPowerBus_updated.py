@@ -1,28 +1,15 @@
+#!/usr/bin/env python3
 import numpy as np
 import math as m
 import matplotlib.pyplot as plt
 import pylab
+from itertools import accumulate
 
-
-#http://www.engineeringtoolbox.com/standard-atmosphere-d_604.html
-alt_table = [-1000,0,1000,2000,3000,4000,5000,6000,7000] # meters
-temp_table = [49,49,8.5,2,-4.49,-10.98,-17.47,-23.96,-30.45] #(21.5 @ 0 in reality, using 49 to be conservative)
-#gravity_table = [9.81,9.807,9.804,9.801,9.797,9.794,9.791,9.788,9.785]
-#pressure_table = [11.39,10.13,8.988,7.95,7.012,6.166,5.405,4.722,4.111]
-#kin_viscosity_table = [1.35189E-05,1.46041E-05,1.58094E-05,1.714E-05,1.86297E-05,2.02709E-05,2.21076E-05,2.4163E-05,2.64576E-05]
-
-# http://www.engineeringtoolbox.com/air-properties-d_156.html
-#temperature_table = [-100,-50,0,20,40,60,80,100,120,140,160,180,200]
-#k_table = [0.016,0.0204,0.0243,0.0257,0.0271,0.0285,0.0299,0.0314,0.0328,0.0343,0.0358,0.0372,0.0386]
-#Pr_table = [0.74,0.725,0.715,0.713,0.711,0.709,0.708,0.703,0.7,0.695,0.69,0.69,0.685]
-
-#http://www.engineeringtoolbox.com/dry-air-properties-d_973.html
-#temperature_alpha = [-73,-23,27,77,127]
-#alpha_table = [0.00001017,0.00001567,0.00002207,0.00002918,0.00003694]
+# Mission Inputs
 app_alt = 304.8  # approach altitude, in meters (1000 ft)
-cruise_alt = 3048  # m, = 10000 ft
+cruise_alt = 3048  # m, --> 10,000 ft
 
-# mission time segments
+# mission time segments in seconds
 m1 = 600  # Taxi from NASA
 m2 = 120  # TAke off checklist
 m3 = 60  # engine run up
@@ -39,136 +26,139 @@ m13 = 120  # final approach
 m14 = 60  # role-out turn off
 m15 = 600  # taxi to NASA
 
-m1_5 = m1+m2+m3+m4+m5
-m1_6 = m1_5+m6
-m1_7 = m1_6+m7
-m1_8 = m1_7+m8
-m1_9 = m1_8+m9
-m1_10 = m1_9+m10
-m1_11 = m1_10+m11
-m1_12 = m1_11+m12
-m1_13 = m1_12+m13
-m1_14 = m1_13+m14
-m1_15 = m1_14+m15
-
-time =     [0, m1_5,    m1_6,       m1_7,       m1_8,    m1_9, m1_10,   m1_11,   m1_12, m1_13, m1_15]
-altitude = [0,    0, app_alt, cruise_alt, cruise_alt, app_alt,     0, app_alt, app_alt,     0,     0]  # m
-
 #carbon fiber specs
-t_cf = 0.0006096 # m
-k_cf = 21 # W/mK
+t_cf = 0.0006096  # (meters) carbon fiber duct thickness
+k_cf = 21  # (W/mK) carbon fiber thermal conductivity
 
-RperL = .003276
-bus_voltage = 416 # V
+# air properties
+k_air = 0.0285  # stagnant air thermal conductivity
+t_air = 0.003937  # air gap inside duct
+
+bus_voltage = 416  # Operating Voltage
 motor_efficiency = 0.95
 inverter_efficiency = 0.95
+
+# wire specs
+RperL = .003276  # resistance of AWG 10 wire
 # number_conductors = 4
 # bundle_derating = 0.5125
-number_conductors = 8
+number_conductors = 8  # 2 bus, 4 conducters per bus
 bundle_derating = 0.375
 alt_derating = 0.925
-d = 0.01905 # m
+d = 0.01905  # m
 AperStrand = 16*np.pi*(2.59E-3)**2/4
-Cp = 385
-rho = 8890
-HC = AperStrand*Cp*rho
+Cp = 385  # Copper Specific Heat
+rho = 8890  # Copper Density
+HC = AperStrand*Cp*rho  # Heat Capacity of Copper Wire
 
-T_wire = 49
+T_wire = 49  # Starting Temperature
 
-ts = 0.5
+ts = 0.1  # time step for Euler Integration
 
-k_air = 0.0285
-t_air = 0.003937
+#--------------------------------------------------
 
-Time = [0] * 7110
-Temp= [0] * 7110
-Temp_cruise = [0] * 7110
-Q_prime = [0] * 7110
-Cruise_current= [0] * 7110
-Duct_Temp=[0] * 7110
+# cumulative mission time breakpoints for altitude table lookup
+mc = list(accumulate([m1,m2,m3,m4,m5,m6,m7,m8,m9,m10,m11,m12,m13,m14,m15]))
 
-i = 0
-q_conv = 0
+time =     [0, mc[4],   mc[5],      mc[6],      mc[7],   mc[8], mc[9],  mc[10],  mc[11], mc[12], mc[14]]
+altitude = [0,     0, app_alt, cruise_alt, cruise_alt, app_alt,     0, app_alt, app_alt,      0,      0]  # m
 
-T_duct = 49
+#http://www.engineeringtoolbox.com/standard-atmosphere-d_604.html
+alt_table = [-1000, 0, 1000, 2000, 3000, 4000, 5000, 6000, 7000] # meters
+temp_table = [49, 49, 8.5, 2, -4.49, -10.98, -17.47, -23.96, -30.45] # Celsius (21.5 @ 0 in reality, using 49 to be conservative)
+#gravity_table = [9.81,9.807,9.804,9.801,9.797,9.794,9.791,9.788,9.785]
+#pressure_table = [11.39,10.13,8.988,7.95,7.012,6.166,5.405,4.722,4.111]
+#kin_viscosity_table = [1.35189E-05,1.46041E-05,1.58094E-05,1.714E-05,1.86297E-05,2.02709E-05,2.21076E-05,2.4163E-05,2.64576E-05]
 
-for t in np.arange(0, 3555, ts):
+# http://www.engineeringtoolbox.com/air-properties-d_156.html
+#temperature_table = [-100,-50,0,20,40,60,80,100,120,140,160,180,200]
+#k_table = [0.016,0.0204,0.0243,0.0257,0.0271,0.0285,0.0299,0.0314,0.0328,0.0343,0.0358,0.0372,0.0386]
+#Pr_table = [0.74,0.725,0.715,0.713,0.711,0.709,0.708,0.703,0.7,0.695,0.69,0.69,0.685]
 
-    if t<=600: # Taxi from NASA
-        dep_power = 0.0 #kW
-        cruise_power = 2.5 #kW
-        #alt = 0
+#http://www.engineeringtoolbox.com/dry-air-properties-d_973.html
+#temperature_alpha = [-73,-23,27,77,127]
+#alpha_table = [0.00001017,0.00001567,0.00002207,0.00002918,0.00003694]
 
-    elif t>600 and t<=720: # TO Checklist
-        dep_power = 0.0 #kW
-        cruise_power = 0.0 #kW
-       # alt = 0
 
-    elif t>720 and t<=780: #Engine Runup
-        dep_power = 30.0 #kW
-        cruise_power = 30.0 #kW
-        #alt = 0
+# initiate transient variable arrays
+t_len = int(mc[-1] * 1./ts)
+Time = np.zeros(t_len)
+Temp = np.zeros(t_len)
+Temp_cruise = np.zeros(t_len)
+Q_prime = np.zeros(t_len)
+Cruise_current = np.zeros(t_len)
+Duct_Temp = np.zeros(t_len)
 
-    elif t>780 and t<=810: # Flight go/no-go
-        dep_power = 0.0 #kW
-        cruise_power = 0.0 #kW
-        #alt = 0
+i = 0  # counter
+q_conv = 0  # starting heat rate (q) out
 
-    elif t>810 and t<=825: # Ground roll
-        dep_power = 30.0 #kW
-        cruise_power = 30.0 #kW
-       # alt = 0
+T_duct = 49  # starting duct temperature (Celcius)
 
-    elif t>825 and t<=885: # Climb to 1000 feet
-        dep_power = 22.5 #kW
-        cruise_power = 30.0 #kW
-        #alt = 0 # *************************
+# perform engineering calculations in a for loop
+# across the entire mission length updating values for each time step
+# (Euler Integration of Duct Temperature State)
+for t in np.arange(0, mc[-1], ts):
 
-    elif t>885 and t<=1605: # Cruise Climb
-        dep_power = 0.0 #kW
-        cruise_power = 30.0 #kW
-        #alt = 0 # *************************
+    if t <= mc[0]:  # Taxi from NASA
+        dep_power = 0.0  # kW
+        cruise_power = 2.5  # kW
 
-    elif t>1605 and t<=1905: # Cruise
-        dep_power = 0.0 #kW
-        cruise_power = 22.5 #kW
-       # alt = 0 # *************************
+    elif t > mc[0] and t <= mc[1]:  # TO Checklist
+        dep_power = 0.0  # kW
+        cruise_power = 0.0  # kW
 
-    elif t>1905 and t<=2505: # Descent to 1000 feet
-        dep_power = 0.0 #kW
-        cruise_power = 15.0 #kW
-        #alt = 0 # *************************
+    elif t > mc[1] and t <= mc[2]:  # Engine Runup
+        dep_power = 30.0  # kW
+        cruise_power = 30.0  # kW
 
-    elif t>2505 and t<=2625: # Final approach
-        dep_power = 22.5 #kW
-        cruise_power = 0.0 #kW
-        #alt = 0 # *************************
+    elif t > mc[2] and t <= mc[3]:  # Flight go/no-go
+        dep_power = 0.0  # kW
+        cruise_power = 0.0  # kW
 
-    elif t>2625 and t<=2685: # Go around to 1000 feet
-        dep_power = 22.5 #kW
-        cruise_power = 30.0 #kW
-        #alt = 0 # *************************
+    elif t > mc[3] and t <= mc[4]:  # Ground roll
+        dep_power = 30.0  # kW
+        cruise_power = 30.0  # kW
 
-    elif t>2685 and t<=2775: # Approach pattern
-        dep_power = 0.0 #kW
-        cruise_power = 30.0 #kW
-        #alt = 0 # *************************
+    elif t > mc[4] and t <= mc[5]:  # Climb to 1000 feet
+        dep_power = 22.5  # kW
+        cruise_power = 30.0  # kW
 
-    elif t>2775 and t<=2895: # Final Approach
-        dep_power = 22.5 #kW
-        cruise_power = 0.0 #kW
-        #alt = 0 # *************************
+    elif t > mc[5] and t <= mc[6]:  # Cruise Climb
+        dep_power = 0.0  # kW
+        cruise_power = 30.0  # kW
 
-    elif t>2895 and t<=2955: # Rollout and turnoff
-        dep_power = 0.0 #kW
-        cruise_power = 3.8 #kW
-        #alt = 0
+    elif t > mc[6] and t <= mc[7]:  # CruiseW
+        dep_power = 0.0  # kW
+        cruise_power = 22.5  # kW
 
-    #elif t>2955 and t<=3555: # Taxi to NASA
-    else:
-        dep_power = 0.0 #kW
-        cruise_power = 2.5 #kW
-        #alt = 0 # *************************
+    elif t > mc[7] and t <= mc[8]:  # Descent to 1000 feet
+        dep_power = 0.0  # kW
+        cruise_power = 15.0  # kW
+
+    elif t > mc[8] and t <= mc[9]:  # Final approach
+        dep_power = 22.5  # kW
+        cruise_power = 0.0  # kW
+
+    elif t > mc[9] and t <= mc[10]:  # Go around to 1000 feet
+        dep_power = 22.5  # kW
+        cruise_power = 30.0  # kW
+
+    elif t > mc[10] and t <= mc[11]:  # Approach pattern
+        dep_power = 0.0  # kW
+        cruise_power = 30.0  # kW
+
+    elif t > mc[11] and t <= mc[12]:  # Final Approach
+        dep_power = 22.5  # kW
+        cruise_power = 0.0  # kW
+
+    elif t > mc[12] and t <= mc[13]:  # Rollout and turnoff
+        dep_power = 0.0  # kW
+        cruise_power = 3.8  # kW
+
+    #elif t>2955 and t<=3555:
+    else:               # Taxi to NASA
+        dep_power = 0.0  # kW
+        cruise_power = 2.5  # kW
 
     # else:
     #     print('error')
@@ -180,8 +170,8 @@ for t in np.arange(0, 3555, ts):
     #Pr = np.interp(T_ambient, temperature_table, Pr_table)
 
     # CRUISE BUS
-    cruise_bus_power = cruise_power/(motor_efficiency*inverter_efficiency) #kW
-    cruise_bus_current = 1000*cruise_bus_power/bus_voltage # ****
+    cruise_bus_power = cruise_power/(motor_efficiency*inverter_efficiency)  # kW
+    cruise_bus_current = 1000*cruise_bus_power/bus_voltage  # ****
     cruise_current_per_conductor = cruise_bus_current/number_conductors
     cruise_current_rating_per_conductor = cruise_current_per_conductor/(bundle_derating*alt_derating)
 
@@ -190,10 +180,9 @@ for t in np.arange(0, 3555, ts):
     # T_wire_cruise = T_wire_cruise + (ts*Temp_ROC_cruise)
 
 
-
     # DEP BUS
-    dep_bus_power = dep_power/(motor_efficiency*inverter_efficiency) #kW
-    dep_bus_current = 1000*dep_bus_power/bus_voltage # ****
+    dep_bus_power = dep_power/(motor_efficiency*inverter_efficiency)  # kW
+    dep_bus_current = 1000*dep_bus_power/bus_voltage  # ****
     dep_current_per_conductor = dep_bus_current/number_conductors
     dep_current_rating_per_conductor = dep_current_per_conductor/(bundle_derating*alt_derating)
 
@@ -234,21 +223,17 @@ for t in np.arange(0, 3555, ts):
 
     # Nu = C* Ra ** n
 
-    h = 7.0 #W/m^2K
-
-    r_conv = 1/(h)
-
-    q_prime_out = np.pi * d *(T_duct-T_ambient)/r_conv
+    h = 7.0  # (W/m^2K) doesn't vary signficantly
+    r_conv = 1/h  # (m^2 K / W)
+    duct_circ = np.pi * d # duct_circumference (assume circuluar for worst case)
+    q_prime_out = duct_circ * (T_duct-T_ambient) * h
 
     q_net = q_prime_in-q_prime_out
 
     Duct_temp_ROC = q_net/(HC)
     T_duct = T_duct + (ts*Duct_temp_ROC)
 
-
-
-
-
+    # save instantaneous states to array
     Time[i] = t
     Temp[i] = T_wire
     Duct_Temp[i] = T_duct
@@ -257,9 +242,10 @@ for t in np.arange(0, 3555, ts):
     # Q_prime[i] = total_q_prime
     # Cruise_current[i] =cruise_current_rating_per_conductor
 
-    i = i+1
+    i = i+1  # increment time
 
-print(max(Duct_Temp))
+# Print Results
+print('Max Duct Temp: %f' % max(Duct_Temp))
 plt.figure()
 plt.plot(Time,Temp, 'r', label = 'Wire')
 plt.plot(Time,Duct_Temp, 'b', label = 'Carbon Fiber Duct')
@@ -268,6 +254,3 @@ plt.legend(bbox_to_anchor=(1, 1),
 plt.xlabel('Time (s)')
 plt.ylabel('Wire Temperature (C)')
 pylab.show()
-
-
-
