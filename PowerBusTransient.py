@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 from openmdao.api import Component
-from openmdao.units.units import convert_units as cu
 
 from itertools import accumulate
 from math import pi
