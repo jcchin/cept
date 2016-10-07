@@ -1,4 +1,26 @@
 #!/usr/bin/env python3
+
+#  Calculate transient duct temperature across entire mission profile
+#  Consider altitude and power profile
+#  Duct temperature state integrated implicitly using Euler integration
+#  (no explicit differential equations)
+
+#  Major Assumptions
+# ------------------
+#  Duct is exposed to ambient air at all points
+#  Wire insulation ignored (conservative)
+#  Duct assumed to be a circle of end radius (conservative)
+#  0-Dimensional Transient (dT/dt), no spatial thermal gradient
+
+#  Methods
+# ------------------
+#  Heating derived from joule heating
+#  Cooling derived from natural convection
+#  Thermal inertia from wire heat capacity
+#  Thermal rate of change driven by Q_in - Q_out
+#  Assume a control volume around all wires
+
+
 import numpy as np
 import math as m
 import matplotlib.pyplot as plt
@@ -7,7 +29,7 @@ from itertools import accumulate
 
 # Mission Inputs
 app_alt = 304.8  # approach altitude, in meters (1000 ft)
-cruise_alt = 3048  # m, --> 10,000 ft
+cruise_alt = 3048.  # m, --> 10,000 ft
 
 # mission time segments in seconds
 m1 = 600  # Taxi from NASA
@@ -28,7 +50,7 @@ m15 = 600  # taxi to NASA
 
 #carbon fiber specs
 t_cf = 0.0006096  # (meters) carbon fiber duct thickness
-k_cf = 21  # (W/mK) carbon fiber thermal conductivity
+k_cf = 21.  # (W/mK) carbon fiber thermal conductivity
 
 # air properties
 k_air = 0.0285  # stagnant air thermal conductivity
@@ -39,22 +61,23 @@ motor_efficiency = 0.95
 inverter_efficiency = 0.95
 
 # wire specs
-RperL = .003276  # resistance of AWG 10 wire
-# number_conductors = 4
+RperL = .003276  # (ohm/m) resistance of AWG 10 wire
+# num_conduct = 4
 # bundle_derating = 0.5125
-number_conductors = 8  # 2 bus, 4 conducters per bus
+num_conduct = 8  # 4 conducters per wire, *2 positive and return lines
+num_bus = 2 # number of power busses
 bundle_derating = 0.375
 alt_derating = 0.925
-d = 0.01905  # m
-AperStrand = 16*np.pi*(2.59E-3)**2/4
-Cp = 385  # Copper Specific Heat
-rho = 8890  # Copper Density
+d = 0.01905  # (m) duct diameter
+AperStrand = num_conduct * num_bus * (np.pi*(2.59E-3)**2/4.)  # total Cu area
+Cp = 385.  # Copper Specific Heat
+rho = 8890.  # Copper Density
 HC = AperStrand*Cp*rho  # Heat Capacity of Copper Wire
 
-T_wire = 49  # Starting Temperature
-
 ts = 0.1  # time step for Euler Integration
-
+q_conv = 0.  # starting heat rate (q) out
+T_wire = 49.  # starting wire temperature
+T_duct = 49.  # starting duct temperature (Celcius)
 #--------------------------------------------------
 
 # cumulative mission time breakpoints for altitude table lookup
@@ -65,7 +88,7 @@ altitude = [0,     0, app_alt, cruise_alt, cruise_alt, app_alt,     0, app_alt, 
 
 #http://www.engineeringtoolbox.com/standard-atmosphere-d_604.html
 alt_table = [-1000, 0, 1000, 2000, 3000, 4000, 5000, 6000, 7000] # meters
-temp_table = [49, 49, 8.5, 2, -4.49, -10.98, -17.47, -23.96, -30.45] # Celsius (21.5 @ 0 in reality, using 49 to be conservative)
+temp_table = [49., 49., 8.5, 2., -4.49, -10.98, -17.47, -23.96, -30.45] # Celsius (21.5 @ 0 in reality, using 49 to be conservative)
 #gravity_table = [9.81,9.807,9.804,9.801,9.797,9.794,9.791,9.788,9.785]
 #pressure_table = [11.39,10.13,8.988,7.95,7.012,6.166,5.405,4.722,4.111]
 #kin_viscosity_table = [1.35189E-05,1.46041E-05,1.58094E-05,1.714E-05,1.86297E-05,2.02709E-05,2.21076E-05,2.4163E-05,2.64576E-05]
@@ -79,7 +102,6 @@ temp_table = [49, 49, 8.5, 2, -4.49, -10.98, -17.47, -23.96, -30.45] # Celsius (
 #temperature_alpha = [-73,-23,27,77,127]
 #alpha_table = [0.00001017,0.00001567,0.00002207,0.00002918,0.00003694]
 
-
 # initiate transient variable arrays
 t_len = int(mc[-1] * 1./ts)
 Time = np.zeros(t_len)
@@ -90,12 +112,9 @@ Cruise_current = np.zeros(t_len)
 Duct_Temp = np.zeros(t_len)
 
 i = 0  # counter
-q_conv = 0  # starting heat rate (q) out
 
-T_duct = 49  # starting duct temperature (Celcius)
-
-# perform engineering calculations in a for loop
-# across the entire mission length updating values for each time step
+# perform engineering calculations in a 'for' loop
+# across the entire mission length updating state values for each time step
 # (Euler Integration of Duct Temperature State)
 for t in np.arange(0, mc[-1], ts):
 
@@ -172,7 +191,7 @@ for t in np.arange(0, mc[-1], ts):
     # CRUISE BUS
     cruise_bus_power = cruise_power/(motor_efficiency*inverter_efficiency)  # kW
     cruise_bus_current = 1000*cruise_bus_power/bus_voltage  # ****
-    cruise_current_per_conductor = cruise_bus_current/number_conductors
+    cruise_current_per_conductor = cruise_bus_current/num_conduct
     cruise_current_rating_per_conductor = cruise_current_per_conductor/(bundle_derating*alt_derating)
 
     q_prime_cruise = cruise_current_rating_per_conductor**2 * RperL
@@ -183,7 +202,7 @@ for t in np.arange(0, mc[-1], ts):
     # DEP BUS
     dep_bus_power = dep_power/(motor_efficiency*inverter_efficiency)  # kW
     dep_bus_current = 1000*dep_bus_power/bus_voltage  # ****
-    dep_current_per_conductor = dep_bus_current/number_conductors
+    dep_current_per_conductor = dep_bus_current/num_conduct
     dep_current_rating_per_conductor = dep_current_per_conductor/(bundle_derating*alt_derating)
 
     q_prime_dep = dep_current_rating_per_conductor**2 * RperL
@@ -253,4 +272,24 @@ plt.legend(bbox_to_anchor=(1, 1),
            bbox_transform=plt.gcf().transFigure)
 plt.xlabel('Time (s)')
 plt.ylabel('Wire Temperature (C)')
+plt.axvline(mc[1], color='k', linestyle='--',lw=0.5)
+plt.axvline(mc[2], color='k', linestyle='--',lw=0.5)
+plt.axvline(mc[3], color='k', linestyle='--',lw=0.5)
+plt.text(250, 170,'Taxi', fontsize=8)
+plt.axvline(mc[4], color='k', linestyle='--',lw=0.5)
+plt.axvline(mc[5], color='k', linestyle='--',lw=0.5)
+plt.text(mc[3]-50, 170,'Take-Off', fontsize=8)
+plt.axvline(mc[6], color='k', linestyle='--',lw=0.5)
+plt.text(mc[5]+150, 160,'10kft Climb', fontsize=8)
+plt.axvline(mc[7], color='k', linestyle='--',lw=0.5)
+plt.text(mc[6]+50, 170,'Cruise', fontsize=8)
+plt.axvline(mc[8], color='k', linestyle='--',lw=0.5)
+plt.text(mc[7]+150, 160,'Descent', fontsize=8)
+plt.axvline(mc[9], color='k', linestyle='--',lw=0.5)
+plt.text(mc[8]+150, 160,'Go-Around', fontsize=8)
+plt.axvline(mc[10], color='k', linestyle='--',lw=0.5)
+plt.axvline(mc[11], color='k', linestyle='--',lw=0.5)
+plt.axvline(mc[12], color='k', linestyle='--',lw=0.5)
+plt.axhline(max(Duct_Temp), color='k', linestyle='--',lw=0.5)
+plt.text(3000, max(Duct_Temp)+2,['Max Temp: %f' % max(Duct_Temp)], fontsize=8)
 pylab.show()
