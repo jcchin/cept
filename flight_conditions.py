@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 from openmdao.api import Component, Group, ScipyGMRES, Newton, IndepVarComp
 from openmdao.units.units import convert_units as cu
 from math import pi

@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 
 from numpy import tanh, arange, meshgrid, empty, exp, zeros
 from numpy import sqrt

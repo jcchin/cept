@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
     HEIST Inverter Heat Sink
         Determines the steady state temperature of the HEIST nacelle.
