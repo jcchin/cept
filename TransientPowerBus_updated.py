@@ -29,7 +29,7 @@ from itertools import accumulate
 
 # Mission Inputs
 app_alt = 304.8  # approach altitude, in meters (1000 ft)
-cruise_alt = 3048.  # m, --> 10,000 ft
+cruise_alt = 2438.4  # m, --> 8,000 ft
 
 # mission time segments in seconds
 m1 = 600  # Taxi from NASA
@@ -62,11 +62,13 @@ inverter_efficiency = 0.95
 
 # wire specs
 RperL = .003276  # (ohm/m) resistance of AWG 10 wire
-# num_conduct = 4
-# bundle_derating = 0.5125
-num_conduct = 8  # 4 conducters per wire, *2 positive and return lines
+num_conduct = 4
+bundle_derating = 0.5125
+# num_conduct = 8  # 4 conducters per wire, *2 positive and return lines
+# bundle_derating = 0.375
 num_bus = 2 # number of power busses
-bundle_derating = 0.375
+
+
 alt_derating = 0.925
 d = 0.01905  # (m) duct diameter
 AperStrand = num_conduct * num_bus * (np.pi*(2.59E-3)**2/4.)  # total Cu area
@@ -74,10 +76,12 @@ Cp = 385.  # Copper Specific Heat
 rho = 8890.  # Copper Density
 HC = AperStrand*Cp*rho  # Heat Capacity of Copper Wire
 
-ts = 0.1  # time step for Euler Integration
+ts = 1  # time step for Euler Integration
 q_conv = 0.  # starting heat rate (q) out
 T_wire = 49.  # starting wire temperature
 T_duct = 49.  # starting duct temperature (Celcius)
+T_wire_cruise = 49.
+T_wire_dep = 49.
 #--------------------------------------------------
 
 # cumulative mission time breakpoints for altitude table lookup
@@ -107,9 +111,12 @@ t_len = int(mc[-1] * 1./ts)
 Time = np.zeros(t_len)
 Temp = np.zeros(t_len)
 Temp_cruise = np.zeros(t_len)
+Temp_dep = np.zeros(t_len)
 Q_prime = np.zeros(t_len)
 Cruise_current = np.zeros(t_len)
 Duct_Temp = np.zeros(t_len)
+I_cruise = np.zeros(t_len)
+I_dep = np.zeros(t_len)
 
 i = 0  # counter
 
@@ -191,28 +198,28 @@ for t in np.arange(0, mc[-1], ts):
     # CRUISE BUS
     cruise_bus_power = cruise_power/(motor_efficiency*inverter_efficiency)  # kW
     cruise_bus_current = 1000*cruise_bus_power/bus_voltage  # ****
-    cruise_current_per_conductor = cruise_bus_current/num_conduct
+    cruise_current_per_conductor = cruise_bus_current/(num_conduct)
     cruise_current_rating_per_conductor = cruise_current_per_conductor/(bundle_derating*alt_derating)
 
-    q_prime_cruise = cruise_current_rating_per_conductor**2 * RperL
-    # Temp_ROC_cruise = q_prime_cruise/HC
+    q_prime_cruise = cruise_current_per_conductor**2 * RperL
+    # Temp_ROC_cruise = q_prime_cruise/(HC)
     # T_wire_cruise = T_wire_cruise + (ts*Temp_ROC_cruise)
 
 
     # DEP BUS
     dep_bus_power = dep_power/(motor_efficiency*inverter_efficiency)  # kW
     dep_bus_current = 1000*dep_bus_power/bus_voltage  # ****
-    dep_current_per_conductor = dep_bus_current/num_conduct
+    dep_current_per_conductor = dep_bus_current/(num_conduct)
     dep_current_rating_per_conductor = dep_current_per_conductor/(bundle_derating*alt_derating)
 
-    q_prime_dep = dep_current_rating_per_conductor**2 * RperL
-    # Temp_ROC_dep = q_prime_dep/HC
+    q_prime_dep = dep_current_per_conductor**2 * RperL
+    # Temp_ROC_dep = q_prime_dep/(HC)
     # T_wire_dep = T_wire_dep + (ts*Temp_ROC_dep)
 
-    q_prime_in = (8*(q_prime_cruise+q_prime_dep))
+    q_prime_in = (num_conduct*(q_prime_cruise+q_prime_dep))
 
 
-    Temp_ROC = q_prime_in/HC
+    Temp_ROC = q_prime_in/(HC)
     T_wire = T_wire + (ts*Temp_ROC)
 
     # r_cond_air = t_air/k_air
@@ -256,22 +263,29 @@ for t in np.arange(0, mc[-1], ts):
     Time[i] = t
     Temp[i] = T_wire
     Duct_Temp[i] = T_duct
-    # Temp_cruise[i] = T_wire_cruise
-    # Temp_dep[i] = T_wire_dep
+    Temp_cruise[i] = T_wire_cruise
+    Temp_dep[i] = T_wire_dep
+    I_cruise[i] = cruise_current_rating_per_conductor
+    I_dep[i] = dep_current_rating_per_conductor
     # Q_prime[i] = total_q_prime
     # Cruise_current[i] =cruise_current_rating_per_conductor
 
     i = i+1  # increment time
 
 # Print Results
-print('Max Duct Temp: %f' % max(Duct_Temp))
+# print('Max Duct Temp: %f' % max(Duct_Temp))
 plt.figure()
 plt.plot(Time,Temp, 'r', label = 'Wire')
 plt.plot(Time,Duct_Temp, 'b', label = 'Carbon Fiber Duct')
+# plt.plot(Time,Temp_cruise, 'r', label = 'Cruise Wires')
+# plt.plot(Time,Temp_dep, 'b', label = 'DEP wires')
+# plt.plot(Time,I_cruise, 'r', label = 'Cruise Wires')
+# plt.plot(Time,I_dep, 'b', label = 'DEP wires')
 plt.legend(bbox_to_anchor=(1, 1),
            bbox_transform=plt.gcf().transFigure)
 plt.xlabel('Time (s)')
 plt.ylabel('Wire Temperature (C)')
+# plt.ylabel('Current rating per conductor (Amp)')
 plt.axvline(mc[1], color='k', linestyle='--',lw=0.5)
 plt.axvline(mc[2], color='k', linestyle='--',lw=0.5)
 plt.axvline(mc[3], color='k', linestyle='--',lw=0.5)
@@ -293,3 +307,9 @@ plt.axvline(mc[12], color='k', linestyle='--',lw=0.5)
 plt.axhline(max(Duct_Temp), color='k', linestyle='--',lw=0.5)
 plt.text(3000, max(Duct_Temp)+2,['Max Temp: %f' % max(Duct_Temp)], fontsize=8)
 pylab.show()
+a = np.asarray([ Time, Temp, Duct_Temp ])
+np.savetxt("temp_data.csv", a, delimiter=",")
+
+output = np.column_stack((Time.flatten(),Temp.flatten(),Duct_Temp.flatten()))
+np.savetxt('temp_data.csv',output,delimiter=',')
+
