@@ -7,7 +7,7 @@
 
 #  Major Assumptions
 # ------------------
-#  Duct is exposed to ambient air at all points
+#  Duct is exposed to ambient air at all points (***important! Either need ambient air inside duct, or inside wing)
 #  Wire insulation ignored (conservative)
 #  Duct assumed to be a circle of end radius (conservative)
 #  0-Dimensional Transient (dT/dt), no spatial thermal gradient
@@ -18,7 +18,9 @@
 #  Cooling derived from natural convection
 #  Thermal inertia from wire heat capacity
 #  Thermal rate of change driven by Q_in - Q_out
-#  Assume a control volume around all wires
+#  Assume a control volume around all wires for heat balance
+#  Convection coefficient held constant h = 7.0 W/m-K (conservative)
+#  (Doesn't vary much, saves numerical instability)
 
 
 import numpy as np
@@ -266,8 +268,8 @@ for t in np.arange(0, mc[-1], ts):
 # Print Results
 print('Max Duct Temp: %f' % max(Duct_Temp))
 plt.figure()
-plt.plot(Time,Temp, 'r', label = 'Wire')
-plt.plot(Time,Duct_Temp, 'b', label = 'Carbon Fiber Duct')
+plt.plot(Time,Temp, 'r', label = 'Wire temp w/o amb cooling')
+plt.plot(Time,Duct_Temp, 'b', label = 'CFiber duct temp w amb cooling')
 plt.legend(bbox_to_anchor=(1, 1),
            bbox_transform=plt.gcf().transFigure)
 plt.xlabel('Time (s)')
