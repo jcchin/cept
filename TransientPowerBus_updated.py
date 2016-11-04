@@ -218,7 +218,7 @@ for t in np.arange(0, mc[-1], ts):
     # Temp_ROC_dep = q_prime_dep/(HC)
     # T_wire_dep = T_wire_dep + (ts*Temp_ROC_dep)
 
-    q_prime_in = (num_conduct*(q_prime_cruise+q_prime_dep))
+    q_prime_in = (2*num_conduct*num_bus*(q_prime_cruise+q_prime_dep))
 
 
     Temp_ROC = q_prime_in/(HC)
