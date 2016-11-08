@@ -29,7 +29,7 @@ class TempBalance(Component):
         super(TempBalance, self).__init__()
 
         self.add_param('q_total_out', 230., units='W', desc='Total Heat Released via Radiation and Natural Convection') #
-        self.add_param('q_total_in', 230., units='W', desc='Total Heat Absorbed/Added via Pods and Solar Absorption') #
+        self.add_param('q_total_in', 230., units='W', desc='Total Heat Absorbed/Added via Joule Heating') #
         self.add_state('temp_boundary', val=322.0, units="K")
 
         self.deriv_options['type'] = 'fd'
@@ -51,11 +51,11 @@ class NacelleWallTemp(Component):
 
         #--Inputs--
         #Parameters/Design Variables
-        self.add_param('radius_outer_tube', 0.08, units='m', desc='tube outer radius')
+        self.add_param('radius_outer_tube', 0.025, units='m', desc='tube outer radius') # 0.08
         self.add_param('length_tube', 0.3, units='m', desc='Length of entire nacelle')
         self.add_param('temp_boundary', 322.0, units='K', desc='Average Temperature of the tube wall') #
         self.add_param('temp_outside_ambient', 305.6, units='K', desc='Average Temperature of the outside air') #
-        self.add_param('heat_inverter', 220., units='W', desc='Heating Due to a Single Pods') #
+        self.add_param('heat_inverter', 300., units='W', desc='Heating Due to a Single Inverter')  #220
 
         #constants
         self.add_param('solar_insolation', 100., units='W/m**2', desc='solar irradiation at sea level on a clear day') #
@@ -95,7 +95,7 @@ class NacelleWallTemp(Component):
     def solve_nonlinear(self, p, u, r):
         """Calculate Various Paramters"""
 
-        u['diameter_outer_tube'] = 2*p['radius_outer_tube']
+        u['diameter_outer_tube'] = 2.*p['radius_outer_tube']
 
         #Determine thermal resistance of outside via Natural Convection or forced convection
         if(p['temp_outside_ambient'] < 400):
@@ -149,8 +149,8 @@ class NacelleWallTemp(Component):
         u['q_rad_tot'] = u['area_rad'] * u['q_rad_per_area']
         #------------
         #Sum Up
-        u['q_total_out'] = u['q_rad_tot'] + u['total_q_nat_conv']
-        u['q_total_in'] = u['q_total_solar'] + p['heat_inverter']
+        u['q_total_out'] =  u['total_q_nat_conv'] + u['q_rad_tot']
+        u['q_total_in'] =  p['heat_inverter']  # + u['q_total_solar']
 
         # print("bar", u['q_total_out'], u['q_total_in'], p['temp_boundary'])
 
@@ -189,10 +189,10 @@ if __name__ == "__main__":
     prob = Problem(root)
 
     dvars = (
-        ('radius', 0.08), #desc='Tube out diameter' #7.3ft
-        ('length_tube', 0.4),  #desc='Length of entire nacelle
+        ('radius', 0.025), #desc='Tube out diameter' #7.3ft
+        ('length_tube', 0.25465),  #desc='Length of entire nacelle
         ('temp_boundary',340.), #desc='Average Temperature of the nacelle') #
-        ('temp_outside_ambient',305.6) #desc='Average Temperature of the outside air
+        ('temp_outside_ambient',45.+273.16) #desc='Average Temperature of the outside air
         )
 
     prob.root.add('vars', IndepVarComp(dvars))
@@ -212,7 +212,9 @@ if __name__ == "__main__":
     prob.run()
 
 
-    print "temp_boundary: ", prob['fs.tmp_balance.temp_boundary']
+    print("temp_boundary: ", prob['fs.tmp_balance.temp_boundary'])
+    print("Q_conv: ", prob['fs.tm.total_q_nat_conv'])
+    print(prob['fs.tm.area_convection'])
 
     # print "-----Completed Tube Heat Flux Model Calculations---"
     # print ""

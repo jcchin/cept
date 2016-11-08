@@ -7,7 +7,7 @@
 
 #  Major Assumptions
 # ------------------
-#  Duct is exposed to ambient air at all points
+#  Duct is exposed to ambient air at all points (***important! Either need ambient air inside duct, or inside wing)
 #  Wire insulation ignored (conservative)
 #  Duct assumed to be a circle of end radius (conservative)
 #  0-Dimensional Transient (dT/dt), no spatial thermal gradient
@@ -18,7 +18,9 @@
 #  Cooling derived from natural convection
 #  Thermal inertia from wire heat capacity
 #  Thermal rate of change driven by Q_in - Q_out
-#  Assume a control volume around all wires
+#  Assume a control volume around all wires for heat balance
+#  Convection coefficient held constant h = 7.0 W/m-K (conservative)
+#  (Doesn't vary much, saves numerical instability)
 
 
 import numpy as np
@@ -28,25 +30,26 @@ import pylab
 from itertools import accumulate
 
 # Mission Inputs
-app_alt = 304.8  # approach altitude, in meters (1000 ft)
+app_alt = 457.2  # approach altitude, in meters (1500 ft)
 cruise_alt = 2438.4  # m, --> 8,000 ft
 
 # mission time segments in seconds
 m1 = 600  # Taxi from NASA
-m2 = 120  # TAke off checklist
-m3 = 60  # engine run up
-m4 = 30  # flight go/no-go
-m5 = 15  # ground role
-m6 = 60  # climb to 1000'
-m7 = 720  # cruise climb
-m8 = 300  # cruise
-m9 = 600  # descent to 1000'
-m10 = 120  # final approach
-m11 = 60  # go around to 1000'
-m12 = 90  # approach pattern
-m13 = 120  # final approach
-m14 = 60  # role-out turn off
-m15 = 600  # taxi to NASA
+m2 = 120  # Take off checklist
+m3 = 30  # Cruise Runup
+m4 = 30  # HLP Runup
+m5 = 30  # flight go/no-go
+m6 = 10  # ground role
+m7 = 90  # climb to 1000'
+m8 = 540  # cruise climb
+m9 = 300  # cruise
+m10 = 450  # descent to 1500'
+m11 = 180  # final approach
+m12 = 90  # go around to 1500'
+m13 = 90  # approach pattern
+m14 = 180  # final approach
+m15 = 60  # role-out turn off
+m16 = 600  # taxi to NASA
 
 #carbon fiber specs
 t_cf = 0.0006096  # (meters) carbon fiber duct thickness
@@ -85,9 +88,9 @@ T_wire_dep = 49.
 #--------------------------------------------------
 
 # cumulative mission time breakpoints for altitude table lookup
-mc = list(accumulate([m1,m2,m3,m4,m5,m6,m7,m8,m9,m10,m11,m12,m13,m14,m15]))
+mc = list(accumulate([m1,m2,m3,m4,m5,m6,m7,m8,m9,m10,m11,m12,m13,m14,m15,m16]))
 
-time =     [0, mc[4],   mc[5],      mc[6],      mc[7],   mc[8], mc[9],  mc[10],  mc[11], mc[12], mc[14]]
+time =     [0, mc[5],   mc[6],      mc[7],      mc[8],   mc[9], mc[10],  mc[11],  mc[12], mc[13], mc[15]]
 altitude = [0,     0, app_alt, cruise_alt, cruise_alt, app_alt,     0, app_alt, app_alt,      0,      0]  # m
 
 #http://www.engineeringtoolbox.com/standard-atmosphere-d_604.html
@@ -133,51 +136,55 @@ for t in np.arange(0, mc[-1], ts):
         dep_power = 0.0  # kW
         cruise_power = 0.0  # kW
 
-    elif t > mc[1] and t <= mc[2]:  # Engine Runup
-        dep_power = 30.0  # kW
+    elif t > mc[1] and t <= mc[2]:  # Cruise Runup
+        dep_power = 0.0  # kW
         cruise_power = 30.0  # kW
 
-    elif t > mc[2] and t <= mc[3]:  # Flight go/no-go
+    elif t > mc[2] and t <= mc[3]:  # HLP Runup
+        dep_power = 30.0  # kW
+        cruise_power = 0.0  # kW
+
+    elif t > mc[3] and t <= mc[4]:  # Flight go/no-go
         dep_power = 0.0  # kW
         cruise_power = 0.0  # kW
 
-    elif t > mc[3] and t <= mc[4]:  # Ground roll
+    elif t > mc[4] and t <= mc[5]:  # Ground roll
         dep_power = 30.0  # kW
         cruise_power = 30.0  # kW
 
-    elif t > mc[4] and t <= mc[5]:  # Climb to 1000 feet
-        dep_power = 22.5  # kW
+    elif t > mc[5] and t <= mc[6]:  # Climb to 1000 feet
+        dep_power = 15.0  # kW
         cruise_power = 30.0  # kW
 
-    elif t > mc[5] and t <= mc[6]:  # Cruise Climb
+    elif t > mc[6] and t <= mc[7]:  # Cruise Climb
         dep_power = 0.0  # kW
         cruise_power = 30.0  # kW
 
-    elif t > mc[6] and t <= mc[7]:  # CruiseW
+    elif t > mc[7] and t <= mc[8]:  # CruiseW
         dep_power = 0.0  # kW
         cruise_power = 22.5  # kW
 
-    elif t > mc[7] and t <= mc[8]:  # Descent to 1000 feet
+    elif t > mc[8] and t <= mc[9]:  # Descent to 1000 feet
         dep_power = 0.0  # kW
         cruise_power = 15.0  # kW
 
-    elif t > mc[8] and t <= mc[9]:  # Final approach
-        dep_power = 22.5  # kW
+    elif t > mc[9] and t <= mc[10]:  # Final approach
+        dep_power = 15.0  # kW
         cruise_power = 0.0  # kW
 
-    elif t > mc[9] and t <= mc[10]:  # Go around to 1000 feet
-        dep_power = 22.5  # kW
+    elif t > mc[10] and t <= mc[11]:  # Go around to 1000 feet
+        dep_power = 15.0  # kW
         cruise_power = 30.0  # kW
 
-    elif t > mc[10] and t <= mc[11]:  # Approach pattern
+    elif t > mc[11] and t <= mc[12]:  # Approach pattern
         dep_power = 0.0  # kW
-        cruise_power = 30.0  # kW
+        cruise_power = 22.5  # kW
 
-    elif t > mc[11] and t <= mc[12]:  # Final Approach
-        dep_power = 22.5  # kW
+    elif t > mc[12] and t <= mc[13]:  # Final Approach
+        dep_power = 15.0  # kW
         cruise_power = 0.0  # kW
 
-    elif t > mc[12] and t <= mc[13]:  # Rollout and turnoff
+    elif t > mc[13] and t <= mc[14]:  # Rollout and turnoff
         dep_power = 0.0  # kW
         cruise_power = 3.8  # kW
 
@@ -275,6 +282,7 @@ for t in np.arange(0, mc[-1], ts):
 # Print Results
 # print('Max Duct Temp: %f' % max(Duct_Temp))
 plt.figure()
+
 plt.plot(Time,Temp, 'r', label = 'Wire')
 plt.plot(Time,Duct_Temp, 'b', label = 'Carbon Fiber Duct')
 # plt.plot(Time,Temp_cruise, 'r', label = 'Cruise Wires')
