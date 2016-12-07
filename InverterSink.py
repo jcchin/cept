@@ -126,7 +126,7 @@ class InverterSink(Component):
         #assumed same velocity through all
         u['V_avg'] = u['Q']/(p['fin_gap']*h)
 
-        print "foobar", u['V_avg'], p['V_0']
+        print("foobar", u['V_avg'], p['V_0'])
 
         #u['dP2'] = (rho/2.)*(u['V_out']**2.-p['V_in']**2.)
 

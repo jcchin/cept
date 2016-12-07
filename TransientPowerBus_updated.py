@@ -318,6 +318,7 @@ plt.axhline(78, color='g', linestyle='--',lw=1)
 plt.text(2400, 78,['Temp Limit: %2.0f' % 78], fontsize=16)
 plt.text(2400, max(Duct_Temp)+2,['Max Temp: %2.2f' % max(Duct_Temp)], fontsize=16)
 pylab.show()
+
 a = np.asarray([ Time, Temp, Duct_Temp ])
 np.savetxt("temp_data.csv", a, delimiter=",")
 

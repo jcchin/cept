@@ -1,10 +1,29 @@
 
 
-# 1. Test fit cell cp and efficiency to match EPS data for 60 cell block
+# 1. Test fit cell cp and efficiency to match EPS data for 640 cell module
 # 2. Use generated cell heating model with X-57 current schedule, scaling down
 #      from full battery system to 60 cell block
 # 3. Determine steady cooler requirement to keep batteries below critical temp: model
 #      first as constant Q (heat pump, simpler to model), then as Qconv ~ h*(Tbatt-Tenv).
+
+
+# Battery Pack
+# (1) Aircraft         -- (2p pack)   (128s x 40 p each) == 5120 cells per
+# (2) Packs            -- (4s modules) (128s x 20p each) == 2560 cell per
+# (8) Modules          -- (4s shelf)   (32s x 20p each)  == 640 cells per
+# (32) Shelves/SubMod  --              (8s x 20p each)   == 160 cells per
+
+# 3.60 V per cell (nominal)
+
+# Based of Per Module... Wrong...
+# 3.58 A per cell (max discharge 45 seconds)
+# 2.04 A per cell (max discharge 180 seconds)
+# 1.52 A per cell (continuous discharge)
+
+# Based per Aircraft... Right...
+# 14.3 A per cell (max discharge 45 seconds)
+# 8.13 A per cell (max discharge 180 seconds)
+# 7.59 A per cell (continuous discharge)
 
 import numpy as np
 import math as m
@@ -34,22 +53,29 @@ m14 = 180  # final approach
 m15 = 60  # role-out turn off
 m16 = 600  # taxi to NASA
 
-mass_cell = 45 # grams
-Cp_cell = 1.02 # J/(gm*K)
-eff_cell = 0.05
-N_cell = 60
-T_0 = 303 # K
-T_sink = 323 #K
-dT = 10 #K
+mass_cell = 0.045  # kg
+Cp_cell = 1020.  # J/(kg*K)
+eff_cell = 0.05  # 1- cell efficiency
+V_cell = 3.6  # V
 
-I_high = 275 # amps
-I_low = 150 # amps
-V_batt = 10 # volts
+T_0 = 303  # K
+T_sink = 323  # K
+dT = 10  # K
 
-Q_high = I_high * V_batt
-Q_low = I_low * V_batt
+#I_high = 275  # amps
+#I_low = 125  # amps
 
-N_scale = 32 #???
+
+P_scale = 40  # number of batts in parallel (divide current, capacity)
+S_scale = 128  # number of batteries in sereis (divide voltage)
+N_cell = P_scale * S_scale
+
+V_batt = V_cell*S_scale  # volts
+
+#Q_high = N_scale * I_high * V_batt
+#Q_low = N_scale * I_low * V_batt
+
+
 
 ts = 0.5
 
@@ -129,33 +155,34 @@ for t in np.arange(0, mc[-1], ts):
         dep_power = 0.0  # kW
         cruise_power = 2.5  # kW
 
+    # current per battery
+    I_cell = 4*(cruise_power + dep_power)*1000./(V_batt*P_scale)
 
-    I_X57 = 4*(cruise_power + dep_power)/(V_batt*N_scale)
+    #   [eff]    *    [cell power]
+    Q_cell = eff_cell * (I_cell * V_cell)
 
-    Q = eff_cell * I_X57 * V_batt
-
-    T_batt = T_0 + Q*ts/(N_cell*mass_cell*Cp_cell)
+    T_cell = T_0 + Q_cell*ts/(mass_cell*Cp_cell)
 
     Time[i] = t
-    Temp[i] = T_batt
-    Current[i] = I_X57
+    Temp[i] = T_cell
+    Current[i] = I_cell
 
-    T_0 = T_batt
+    T_0 = T_cell
 
     i = i + 1
 
     # Print Results
 
-
+print('Max current: %f' % max(Current))
 print('Max Temp: %f' % max(Temp))
 plt.figure()
 
-plt.plot(Time,Temp, 'r', label = 'Wire')
+plt.plot(Time,Temp, 'r', label = 'Battery')
 
 plt.legend(bbox_to_anchor=(1, 1),
            bbox_transform=plt.gcf().transFigure)
 plt.xlabel('Time (s)')
-plt.ylabel('Battery Pack Temperature (C)')
+plt.ylabel('Battery Pack Temperature (K)')
 # plt.ylabel('Current rating per conductor (Amp)')
 plt.axvline(mc[1], color='k', linestyle='--',lw=0.5)
 plt.axvline(mc[2], color='k', linestyle='--',lw=0.5)
@@ -176,13 +203,14 @@ plt.axvline(mc[10], color='k', linestyle='--',lw=0.5)
 plt.axvline(mc[11], color='k', linestyle='--',lw=0.5)
 plt.axvline(mc[12], color='k', linestyle='--',lw=0.5)
 plt.axhline(max(Temp), color='k', linestyle='--',lw=0.5)
-plt.text(3000, max(Temp)+2,['Max Temp: %f' % max(Temp)], fontsize=8)
+plt.axhline(333., color='r', linestyle='--',lw=1.0)
+#plt.text(3000, max(Temp)+2,['Max Temp: %f' % max(Temp)], fontsize=8)
 pylab.show()
-a = np.asarray([ Time, Temp, Duct_Temp ])
-np.savetxt("temp_data.csv", a, delimiter=",")
+#a = np.asarray([ Time, Temp, Duct_Temp ])
+#np.savetxt("temp_data.csv", a, delimiter=",")
 
-output = np.column_stack((Time.flatten(),Temp.flatten(),Duct_Temp.flatten()))
-np.savetxt('temp_data.csv',output,delimiter=',')
+#output = np.column_stack((Time.flatten(),Temp.flatten(),Duct_Temp.flatten()))
+#np.savetxt('temp_data.csv',output,delimiter=',')
 
 
 
