@@ -30,7 +30,7 @@ k_tpe = 0.2 # (W/m K) Thermoplastic elastomer
 # test conditions
 bus_voltage = 416  # Operating Voltage
 current = 50.  # amps
-P_time = 15.*60.  # seconds powered on
+P_time = 21.*60.  # seconds powered on
 C_time = 10.*60. # seconds cooling open-air
 # air properties
 k_air = 0.0285  # (W/m K) stagnant air thermal conductivity
@@ -50,14 +50,14 @@ A_tpe = 8.09E-5 - A_cu # total area - A_cu
 Cp_tpe = 580. # (J/kg*K) specific heat TPE
 rho_tpe = 1200.  # (kg/m^3)
 HC_tpe = A_tpe*Cp_tpe*rho_tpe  # (J/K*m) Heat Capacity per length of Copper Wire
-HC = (HC_cu + HC_tpe)
+HC = (HC_cu + HC_tpe)  * 2.3
 
 
 ts = 0.1  # time step for Euler Integration
 q_conv = 0.  # starting heat rate (q) out
 T_ins = 24.  # starting wire temperature (Celcius)
-T_open = 24.  # starting wire temperature (Celcius)
-T_ambient = 24.
+T_open = 22.5  # starting wire temperature (Celcius)
+T_ambient = 22.5
 #--------------------------------------------------
 
 # initiate transient variable arrays
@@ -70,26 +70,25 @@ Temp = np.zeros(t_len)
 Temp_open = np.zeros(t_len)
 Temp_ins = np.zeros(t_len)
 
-print(P_time,C_time)
 # (Euler Integration of Duct Temperature State)
 # all calculations are per length (ohm/m, W/m, etc..)
 for i,t in enumerate(np.arange(0, ttime, ts)):
 
     q_prime_in = current**2 * RperL
-    h = 12.0 # (W/m^2K) open-air cooling rate
-    q_prime_outi = 0. # fully insulated
+    hi = 0.5  # fully insulated
+    ho = 13.8  # (W/m^2K) open-air cooling rate
 
     if(t > P_time): # turn off power, turn on fans
         q_prime_in = 0.
-        h = 25.0  # (W/m^2K) fan cooling rate
-        q_prime_outi = circ_tpe * (T_ins-T_ambient) * h
+        hi = 3.0  # (W/m^2K) fan cooling rate
+    q_prime_outi = circ_tpe * (T_ins-T_ambient) * hi
 
     #print(q_prime_in)
     Ins_Temp_ROC = (q_prime_in-q_prime_outi)/HC
     T_ins = T_ins + (ts*Ins_Temp_ROC)
 
 
-    q_prime_outo = circ_tpe * (T_open-T_ambient) * h
+    q_prime_outo = circ_tpe * (T_open-T_ambient) * ho
 
     Open_temp_ROC = (q_prime_in-q_prime_outo)/HC
     T_open = T_open + (ts*Open_temp_ROC)
@@ -110,6 +109,44 @@ plt.legend(bbox_to_anchor=(1, 1),
 plt.xlabel('Time (m)')
 plt.ylabel('Wire Temperature (C)',fontsize=18)
 plt.rcParams['xtick.labelsize'] = 24
+
+import csv
+from collections import defaultdict
+
+columns = defaultdict(list) # each value in each column is appended to a list
+
+with open('Cal4c.csv') as f:
+    reader = csv.DictReader(f, delimiter=',',) # read rows into a dictionary format
+    for row in reader: # read a row as {column1: value1, column2: value2,...}
+        for (k,v) in row.items(): # go over each column name and value
+            columns[k].append(v) # append the value into the appropriate list
+                                 # based on column name k
+
+TestTime = np.asarray(columns['Time'],dtype=np.float32)/60.
+O2 = np.asarray(columns['O2'])
+O4 = np.asarray(columns['O4'])
+I2 = np.asarray(columns['I2'])
+I4 = np.asarray(columns['I4'])
+
+skip = 415  # cut out beginning
+end = 31*60 # cut out end
+I2 = I2[skip:]
+I4 = I4[skip:]
+O2 = O2[skip:]
+O4 = O4[skip:]
+TestTime = TestTime[skip:] - float(skip)/60. #sync timestep
+I2 = I2[:end]
+I4 = I4[:end]
+O2 = O2[:end]
+O4 = O4[:end]
+TestTime = TestTime[:end]
+
+plt.plot(TestTime,I2, 'k', label = 'Test I2', lw=1.5)
+plt.plot(TestTime,I4, 'k--', label = 'Test I4', lw=1.5)
+plt.plot(TestTime,O2, 'g', label = 'Test O2', lw=1.5)
+plt.plot(TestTime,O4, 'g--', label = 'Test O2', lw=1.5)
+
+
 pylab.show()
 
 # output = np.column_stack((Time.flatten(),Temp.flatten(),Wire_Temp.flatten()))

@@ -90,7 +90,7 @@ T_insD = 20.1  # starting wire temperature (Celcius)
 T_openD = 20.1  # starting wire temperature (Celcius)
 T_ambient = 15.9
 #--------------------------------------------------
-HCO = 2*(HC_cu + HC_tpe)*2.3
+HCO = 2.*(HC_cu + HC_tpe)*2.3
 HCI = HCO + 50.
 hI = 8.0  # (W/m^2K) insulated
 hO = 24.  # open-air
@@ -291,10 +291,10 @@ skip = 165
 #deltaI = I2[2] - I4[2] #calibrate for different baseline temp
 #deltaO = O2[2] - O4[2]
 I2 = I2[skip:]
-I4 = I4[skip:] #+ 0.22
+I4 = I4[skip:]
 O2 = O2[skip:]
-O4 = O4[skip:] #+ 0.27
-TestTime = TestTime[skip:] - skip/60.
+O4 = O4[skip:]
+TestTime = TestTime[skip:] - float(skip)/60.
 
 plt.plot(TestTime,I2, 'k', label = 'Test I2', lw=1.5)
 plt.plot(TestTime,I4, 'k--', label = 'Test I4', lw=1.5)
