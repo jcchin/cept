@@ -64,8 +64,8 @@ motor_efficiency = 0.95
 inverter_efficiency = 0.95
 
 # wire specs
-RperL = .003276  # (ohm/m) resistance of AWG 10 wire
-num_conduct = 4
+RperL = 0.005208 #.003276  # (ohm/m) resistance of AWG 10 wire
+num_conduct = 6 #4
 bundle_derating = 0.5125
 # num_conduct = 8  # 4 conducters per wire, *2 positive and return lines
 # bundle_derating = 0.375
@@ -74,7 +74,8 @@ num_bus = 2 # number of power busses
 
 alt_derating = 0.925
 d = 0.01905  # (m) duct diameter
-AperStrand = num_conduct * num_bus * (np.pi*(2.59E-3)**2/4.)  # total Cu area
+cd = 2.05E-3 #2.59E-3
+AperStrand = num_conduct * num_bus * (np.pi*(cd)**2/4.)  # total Cu area
 Cp = 385.  # Copper Specific Heat
 rho = 8890.  # Copper Density
 HC = AperStrand*Cp*rho  # Heat Capacity of Copper Wire
