@@ -50,8 +50,10 @@ A_tpe = 8.09E-5 - A_cu # total area - A_cu
 Cp_tpe = 580. # (J/kg*K) specific heat TPE
 rho_tpe = 1200.  # (kg/m^3)
 HC_tpe = A_tpe*Cp_tpe*rho_tpe  # (J/K*m) Heat Capacity per length of Copper Wire
-HC = (HC_cu + HC_tpe)  * 2.3
+HC = (HC_cu + HC_tpe)  * 1.75
 
+#HC = 240.
+print(HC)
 
 ts = 0.1  # time step for Euler Integration
 q_conv = 0.  # starting heat rate (q) out
@@ -75,12 +77,12 @@ Temp_ins = np.zeros(t_len)
 for i,t in enumerate(np.arange(0, ttime, ts)):
 
     q_prime_in = current**2 * RperL
-    hi = 0.5  # fully insulated
+    hi = 2.5  # fully insulated
     ho = 13.8  # (W/m^2K) open-air cooling rate
 
     if(t > P_time): # turn off power, turn on fans
         q_prime_in = 0.
-        hi = 3.0  # (W/m^2K) fan cooling rate
+        hi = 2.  # (W/m^2K) fan cooling rate
     q_prime_outi = circ_tpe * (T_ins-T_ambient) * hi
 
     #print(q_prime_in)
