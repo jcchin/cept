@@ -89,6 +89,12 @@ T_openC = 18.1  # starting wire temperature (Celcius)
 T_insD = 20.1  # starting wire temperature (Celcius)
 T_openD = 20.1  # starting wire temperature (Celcius)
 T_ambient = 15.9
+
+# T_insC = 49.  # starting wire temperature (Celcius)
+# T_openC = 49.  # starting wire temperature (Celcius)
+# T_insD = 49.  # starting wire temperature (Celcius)
+# T_openD = 49.  # starting wire temperature (Celcius)
+# T_ambient = 49.
 #--------------------------------------------------
 HCO = 2.*(HC_cu + HC_tpe)*2.3
 HCI = HCO + 50.
@@ -288,8 +294,6 @@ I2 = np.asarray(columns['I2'])
 I4 = np.asarray(columns['I4'])
 
 skip = 165
-#deltaI = I2[2] - I4[2] #calibrate for different baseline temp
-#deltaO = O2[2] - O4[2]
 I2 = I2[skip:]
 I4 = I4[skip:]
 O2 = O2[skip:]
