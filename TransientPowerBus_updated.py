@@ -7,8 +7,6 @@
 
 #  Major Assumptions
 # ------------------
-#  Duct is exposed to ambient air at all points (***important! Either need ambient air inside duct, or inside wing)
-#  Wire insulation ignored (conservative)
 #  Duct assumed to be a circle of end radius (conservative)
 #  0-Dimensional Transient (dT/dt), no spatial thermal gradient
 
@@ -52,8 +50,8 @@ m15 = 60  # role-out turn off
 m16 = 600  # taxi to NASA
 
 #carbon fiber specs
-t_cf = 0.0006096  # (meters) carbon fiber duct thickness
-k_cf = 21.  # (W/mK) carbon fiber thermal conductivity
+t_fg = 0.0006096  # (meters) fiberglass duct thickness
+k_fg = 0.04  # (W/mK) fiberglass thermal conductivity
 
 # air properties
 k_air = 0.0285  # stagnant air thermal conductivity
@@ -64,28 +62,31 @@ motor_efficiency = 0.95
 inverter_efficiency = 0.95
 
 # wire specs
-RperL = 0.005208 #.003276  # (ohm/m) resistance of AWG 10 wire
-num_conduct = 6 #4
-bundle_derating = 0.5125
+RperL = 0.00096 #RperL = 0.005208 #.003276  # (ohm/m) resistance of AWG 10 wire
+#num_conduct = 6 #4
+#bundle_derating = 0.5125
 # num_conduct = 8  # 4 conducters per wire, *2 positive and return lines
 # bundle_derating = 0.375
-num_bus = 2 # number of power busses
-
+#num_bus = 2 # number of power busses
 
 alt_derating = 0.925
 d = 0.01905  # (m) duct diameter
-cd = 2.05E-3 #2.59E-3
-AperStrand = num_conduct * num_bus * (np.pi*(cd)**2/4.)  # total Cu area
-Cp = 385.  # Copper Specific Heat
-rho = 8890.  # Copper Density
-HC = AperStrand*Cp*rho  # Heat Capacity of Copper Wire
-
-ts = 1  # time step for Euler Integration
-q_conv = 0.  # starting heat rate (q) out
-T_wire = 49.  # starting wire temperature
-T_duct = 49.  # starting duct temperature (Celcius)
-T_wire_cruise = 49.
-T_wire_dep = 49.
+circ_tpe = 0.040132 # jacket circumference
+# cd = 2.05E-3 #2.59E-3
+# AperStrand = num_conduct * num_bus * (np.pi*(cd)**2/4.)  # total Cu area
+# Cp = 385.  # Copper Specific Heat
+# rho = 8890.  # Copper Density
+# HC = AperStrand*Cp*rho  # Heat Capacity of Copper Wire
+HC = 240.
+ts = 0.1  # time step for Euler Integration
+hC = 3.3
+hD = 3.3
+#q_conv = 0.  # starting heat rate (q) out
+#T_wire = 49.  # starting wire temperature
+#T_duct = 49.  # starting duct temperature (Celcius)
+T_cruise = 49.
+T_dep = 49.
+T_ambient = 49.
 #--------------------------------------------------
 
 # cumulative mission time breakpoints for altitude table lookup
@@ -113,21 +114,13 @@ temp_table = [49., 49., 8.5, 2., -4.49, -10.98, -17.47, -23.96, -30.45] # Celsiu
 # initiate transient variable arrays
 t_len = int(mc[-1] * 1./ts)
 Time = np.zeros(t_len)
-Temp = np.zeros(t_len)
 Temp_cruise = np.zeros(t_len)
 Temp_dep = np.zeros(t_len)
-Q_prime = np.zeros(t_len)
-Cruise_current = np.zeros(t_len)
-Duct_Temp = np.zeros(t_len)
-I_cruise = np.zeros(t_len)
-I_dep = np.zeros(t_len)
-
-i = 0  # counter
 
 # perform engineering calculations in a 'for' loop
 # across the entire mission length updating state values for each time step
 # (Euler Integration of Duct Temperature State)
-for t in np.arange(0, mc[-1], ts):
+for i,t in enumerate(np.arange(0, mc[-1], ts)):
 
     if t <= mc[0]:  # Taxi from NASA
         dep_power = 0.0  # kW
@@ -198,98 +191,52 @@ for t in np.arange(0, mc[-1], ts):
     #     print('error')
     #     quit()
     alt = np.interp(t, time, altitude)
-    T_ambient = np.interp(alt, alt_table, temp_table)
+    T_ambient = 49.#np.interp(alt, alt_table, temp_table)
     #kinematic_viscosity = np.interp(alt, alt_table, kin_viscosity_table)
     #k_air = np.interp(T_ambient, temperature_table, k_table)
     #Pr = np.interp(T_ambient, temperature_table, Pr_table)
 
     # CRUISE BUS
-    cruise_bus_power = cruise_power/(motor_efficiency*inverter_efficiency)  # kW
-    cruise_bus_current = 1000*cruise_bus_power/bus_voltage  # ****
-    cruise_current_per_conductor = cruise_bus_current/(num_conduct)
-    cruise_current_rating_per_conductor = cruise_current_per_conductor/(bundle_derating*alt_derating)
+    # cruise_bus_power = cruise_power/(motor_efficiency*inverter_efficiency)  # kW
+    # cruise_bus_current = 1000*cruise_bus_power/bus_voltage  # ****
+    # cruise_current_per_conductor = cruise_bus_current/(num_conduct)
+    # cruise_current_rating_per_conductor = cruise_current_per_conductor/(bundle_derating*alt_derating)
+    # q_prime_cruise = cruise_current_per_conductor**2 * RperL
 
-    q_prime_cruise = cruise_current_per_conductor**2 * RperL
-    # Temp_ROC_cruise = q_prime_cruise/(HC)
-    # T_wire_cruise = T_wire_cruise + (ts*Temp_ROC_cruise)
+    cruise_bus_power = cruise_power/(motor_efficiency*inverter_efficiency)  # kW
+    cruise_bus_current = (1000.*cruise_bus_power/bus_voltage)/alt_derating  # ****
+    q_prime_cruise = cruise_bus_current**2. * RperL
 
 
     # DEP BUS
     dep_bus_power = dep_power/(motor_efficiency*inverter_efficiency)  # kW
-    dep_bus_current = 1000*dep_bus_power/bus_voltage  # ****
-    dep_current_per_conductor = dep_bus_current/(num_conduct)
-    dep_current_rating_per_conductor = dep_current_per_conductor/(bundle_derating*alt_derating)
-
-    q_prime_dep = dep_current_per_conductor**2 * RperL
+    dep_bus_current = (1000*dep_bus_power/bus_voltage)/alt_derating  # ****
+    q_prime_dep = dep_bus_current**2 * RperL
     # Temp_ROC_dep = q_prime_dep/(HC)
     # T_wire_dep = T_wire_dep + (ts*Temp_ROC_dep)
 
-    q_prime_in = (2*num_conduct*num_bus*(q_prime_cruise+q_prime_dep))
+    q_prime_outC = circ_tpe * (T_cruise-T_ambient) * hC
+    q_prime_outD = circ_tpe * (T_dep-T_ambient) * hD
 
-
-    Temp_ROC = q_prime_in/(HC)
-    T_wire = T_wire + (ts*Temp_ROC)
-
-    # r_cond_air = t_air/k_air
-    # r_cond_cf = t_cf/k_cf
-
-    # T_duct = T_wire - (total_q_prime*(r_cond_cf+r_cond_air))
-
-    # T_film = ((T_duct+T_ambient)/2)+273 #K
-    # alpha = np.interp(T_film, temperature_alpha, alpha_table)
-
-    # Ra = (9.81*(1/T_film) * (T_wire- T_ambient) * d**3)/ (kinematic_viscosity*38.3E-6)
-
-    # print(Ra, T_duct)
-
-    # if Ra < 100:
-    #     C = 1.02
-    #     n = 0.148
-    # elif Ra < 10000 and Ra >= 100:
-    #     C = 0.850
-    #     n = 0.188
-    # elif Ra < 10**7 and Ra >= 10000:
-    #     C = 0.480
-    #     n = 0.250
-    # else:
-    #     C = 0.125
-    #     n = 0.333
-
-    # Nu = C* Ra ** n
-
-    h = 7.0  # (W/m^2K) doesn't vary signficantly
-    r_conv = 1/h  # (m^2 K / W)
-    duct_circ = np.pi * d # duct_circumference (assume circuluar for worst case)
-    q_prime_out = duct_circ * (T_duct-T_ambient) * h
-
-    q_net = q_prime_in-q_prime_out
-
-    Duct_temp_ROC = q_net/(HC)
-    T_duct = T_duct + (ts*Duct_temp_ROC)
+    Temp_ROCC = (q_prime_cruise - q_prime_outC) / HC
+    Temp_ROCD = (q_prime_dep - q_prime_outD) / HC
+    T_cruise = T_cruise + (ts*Temp_ROCC)
+    T_dep = T_dep + (ts*Temp_ROCD)
 
     # save instantaneous states to array
     Time[i] = t
-    Temp[i] = T_wire
-    Duct_Temp[i] = T_duct
-    Temp_cruise[i] = T_wire_cruise
-    Temp_dep[i] = T_wire_dep
-    I_cruise[i] = cruise_current_rating_per_conductor
-    I_dep[i] = dep_current_rating_per_conductor
-    # Q_prime[i] = total_q_prime
-    # Cruise_current[i] =cruise_current_rating_per_conductor
-
-    i = i+1  # increment time
+    #Temp[i] = T_wire
+    #Duct_Temp[i] = T_duct
+    Temp_cruise[i] = T_cruise
+    Temp_dep[i] = T_dep
 
 # Print Results
-# print('Max Duct Temp: %f' % max(Duct_Temp))
+
 plt.figure()
 
-#plt.plot(Time,Temp, 'r', label = 'Wire')
-plt.plot(Time,Duct_Temp, 'b', label = 'Carbon Fiber Duct', lw=1.5)
-# plt.plot(Time,Temp_cruise, 'r', label = 'Cruise Wires')
-# plt.plot(Time,Temp_dep, 'b', label = 'DEP wires')
-# plt.plot(Time,I_cruise, 'r', label = 'Cruise Wires')
-# plt.plot(Time,I_dep, 'b', label = 'DEP wires')
+plt.plot(Time,Temp_cruise, 'b', label = 'Cruise Ducts', lw=1.5)
+plt.plot(Time,Temp_dep, 'g', label = 'DEP Ducts', lw=1.5)
+
 plt.legend(bbox_to_anchor=(1, 1),
            bbox_transform=plt.gcf().transFigure)
 plt.xlabel('Time (s)')
@@ -314,15 +261,15 @@ plt.text(mc[9]+150, 60,'Go-Around', fontsize=8)
 plt.axvline(mc[10], color='k', linestyle='--',lw=0.5)
 plt.axvline(mc[11], color='k', linestyle='--',lw=0.5)
 plt.axvline(mc[12], color='k', linestyle='--',lw=0.5)
-plt.axhline(max(Duct_Temp), color='k', linestyle='--',lw=1)
-plt.axhline(78, color='g', linestyle='--',lw=1)
-plt.text(2400, 78,['Temp Limit: %2.0f' % 78], fontsize=16)
-plt.text(2400, max(Duct_Temp)+2,['Max Temp: %2.2f' % max(Duct_Temp)], fontsize=16)
+plt.axhline(max(Temp_cruise), color='k', linestyle='--',lw=1)
+plt.axhline(74, color='g', linestyle='--',lw=1)
+plt.text(2400, 74,['Temp Limit: %2.0f' % 76], fontsize=16)
+plt.text(2400, max(Temp_cruise),['Max Temp: %2.2f' % max(Temp_cruise)], fontsize=16)
 pylab.show()
 
-a = np.asarray([ Time, Temp, Duct_Temp ])
-np.savetxt("temp_data.csv", a, delimiter=",")
+# a = np.asarray([ Time, Temp, Duct_Temp ])
+# np.savetxt("temp_data.csv", a, delimiter=",")
 
-output = np.column_stack((Time.flatten(),Temp.flatten(),Duct_Temp.flatten()))
-np.savetxt('temp_data.csv',output,delimiter=',')
+# output = np.column_stack((Time.flatten(),Temp.flatten(),Duct_Temp.flatten()))
+# np.savetxt('temp_data.csv',output,delimiter=',')
 

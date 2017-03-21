@@ -29,7 +29,7 @@ k_tpe = 0.2 # (W/m K) Thermoplastic elastomer
 
 # test conditions
 bus_voltage = 416  # Operating Voltage
-current = 50.  # amps
+current = 55.3  # amps
 P_time = 21.*60.  # seconds powered on
 C_time = 10.*60. # seconds cooling open-air
 # air properties
@@ -52,7 +52,8 @@ rho_tpe = 1200.  # (kg/m^3)
 HC_tpe = A_tpe*Cp_tpe*rho_tpe  # (J/K*m) Heat Capacity per length of Copper Wire
 HC = (HC_cu + HC_tpe)  * 1.75
 
-#HC = 240.
+HC = 240.
+#HC = 322.
 print(HC)
 
 ts = 0.1  # time step for Euler Integration
@@ -77,12 +78,14 @@ Temp_ins = np.zeros(t_len)
 for i,t in enumerate(np.arange(0, ttime, ts)):
 
     q_prime_in = current**2 * RperL
-    hi = 2.5  # fully insulated
-    ho = 13.8  # (W/m^2K) open-air cooling rate
+    #hi = 2.3  # fully insulated
+    hi = -0.1031 * (ts/600.) + 3.3583
+    ho = 17.29  # (W/m^2K) open-air cooling rate
 
     if(t > P_time): # turn off power, turn on fans
         q_prime_in = 0.
-        hi = 2.  # (W/m^2K) fan cooling rate
+        hi = 2.3  # (W/m^2K) fan cooling rate
+        ho = 17.29
     q_prime_outi = circ_tpe * (T_ins-T_ambient) * hi
 
     #print(q_prime_in)
@@ -104,10 +107,6 @@ for i,t in enumerate(np.arange(0, ttime, ts)):
 
 # Print Results
 plt.figure()
-plt.plot(Time/60.,Temp_ins, 'r', label = 'Insulated', lw=1.5)
-plt.plot(Time/60.,Temp_open, 'g', label = 'Open', lw=1.5)
-plt.legend(bbox_to_anchor=(1, 1),
-           bbox_transform=plt.gcf().transFigure)
 plt.xlabel('Time (m)')
 plt.ylabel('Wire Temperature (C)',fontsize=18)
 plt.rcParams['xtick.labelsize'] = 24
@@ -143,10 +142,14 @@ O2 = O2[:end]
 O4 = O4[:end]
 TestTime = TestTime[:end]
 
-plt.plot(TestTime,I2, 'k', label = 'Test I2', lw=1.5)
-plt.plot(TestTime,I4, 'k--', label = 'Test I4', lw=1.5)
-plt.plot(TestTime,O2, 'g', label = 'Test O2', lw=1.5)
-plt.plot(TestTime,O4, 'g--', label = 'Test O2', lw=1.5)
+plt.plot(Time/60.,Temp_ins, 'r', label = 'Model Insulated', lw=1.5)
+plt.plot(TestTime,I2, 'k', label = 'Observed Insulated', lw=1.5)
+#plt.plot(TestTime,I4, 'k--', label = 'Test I4', lw=1.5)
+plt.plot(Time/60.,Temp_open, 'g', label = 'Model Open', lw=1.5)
+plt.plot(TestTime,O2, 'g', label = 'Observed Open', lw=1.5)
+plt.legend(bbox_to_anchor=(1, 1),
+           bbox_transform=plt.gcf().transFigure)
+#plt.plot(TestTime,O4, 'g--', label = 'Test O2', lw=1.5)
 
 
 pylab.show()

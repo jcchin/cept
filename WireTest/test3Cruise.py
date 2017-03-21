@@ -96,10 +96,16 @@ T_ambient = 15.9
 # T_openD = 49.  # starting wire temperature (Celcius)
 # T_ambient = 49.
 #--------------------------------------------------
-HCO = 2.*(HC_cu + HC_tpe)*2.3
-HCI = HCO + 50.
-hI = 8.0  # (W/m^2K) insulated
-hO = 24.  # open-air
+#HCO = (HC_cu + HC_tpe)*2.3
+HCO = 240.
+#HCI = HCO + 50.
+HCI = 240.
+print(HCO,HCI)
+
+#hI = 2.3 # (W/m^2K) insulated
+hO = 11.1  # open-air
+
+#hO = 17.29  # (W/m^2K) open-air cooling rate
 #q_ins_out = 3. # heat leaked through insulation
 # cumulative mission time breakpoints for altitude table lookup
 mc = list(accumulate([m1,m2,m3,m4,m5,m6,m7,m8,m9,m10,m11,m12,m13,m14,m15,m16,m17]))
@@ -117,7 +123,7 @@ Temp_insD = np.zeros(t_len)
 # across the entire mission length updating state values for each time step
 # (Euler Integration of Duct Temperature State)
 for i,t in enumerate(np.arange(0, mc[-1], ts)):
-
+    hI = -0.1031 * (ts/600.) + 3.3583
     if t <= mc[0]:                  # up
         dep_power = 0.0  # kW
         cruise_power = 15.  # kW
@@ -196,15 +202,15 @@ for i,t in enumerate(np.arange(0, mc[-1], ts)):
     q_prime_cruise = cruise_bus_current**2. * RperL
 
     q_prime_outoCI = circ_tpe * (T_insC-T_ambient) * hI
-    if(t/60. > 10.):
-        q_prime_outoCI = 3.7
+    # if(t/60. > 10.):
+    #     q_prime_outoCI = 1.9
 
-    Ins_Temp_ROCC = ((2.*q_prime_cruise)-q_prime_outoCI)/HCI
+    Ins_Temp_ROCC = ((q_prime_cruise)-q_prime_outoCI)/HCI
     T_insC = T_insC + (ts*Ins_Temp_ROCC)
 
     q_prime_outoCO = circ_tpe * (T_openC-T_ambient) * hO
 
-    Open_temp_ROCC = (2.*q_prime_cruise-q_prime_outoCO)/HCO
+    Open_temp_ROCC = (q_prime_cruise-q_prime_outoCO)/HCO
     T_openC = T_openC + (ts*Open_temp_ROCC)
 
     # DEP BUS
@@ -233,8 +239,6 @@ for i,t in enumerate(np.arange(0, mc[-1], ts)):
 plt.figure()
 
 #plt.plot(Time,Temp, 'r', label = 'Wire')
-plt.plot(Time/60.,Temp_openC, 'b', label = 'Open-air Cruise', lw=1.5)
-plt.plot(Time/60.,Temp_insC, 'r', label = 'Insulated Cruise', lw=1.5)
 
 #plt.plot(Time/60.,Temp_openD, 'c', label = 'Open-air DEP', lw=1.5)
 #plt.plot(Time/60.,Temp_insD, 'm', label = 'Insulated DEP', lw=1.5)
@@ -242,8 +246,7 @@ plt.plot(Time/60.,Temp_insC, 'r', label = 'Insulated Cruise', lw=1.5)
 # plt.plot(Time,Temp_dep, 'b', label = 'DEP wires')
 # plt.plot(Time,I_cruise, 'r', label = 'Cruise Wires')
 # plt.plot(Time,I_dep, 'b', label = 'DEP wires')
-plt.legend(bbox_to_anchor=(1, 1),
-           bbox_transform=plt.gcf().transFigure)
+
 plt.xlabel('Time (m)')
 plt.ylabel('Wire Temperature (C)',fontsize=18)
 plt.rcParams['xtick.labelsize'] = 24
@@ -300,11 +303,15 @@ O2 = O2[skip:]
 O4 = O4[skip:]
 TestTime = TestTime[skip:] - float(skip)/60.
 
-plt.plot(TestTime,I2, 'k', label = 'Test I2', lw=1.5)
-plt.plot(TestTime,I4, 'k--', label = 'Test I4', lw=1.5)
-plt.plot(TestTime,O2, 'g', label = 'Test O2', lw=1.5)
-plt.plot(TestTime,O4, 'g--', label = 'Test O2', lw=1.5)
+plt.plot(TestTime,I2, 'k', label = 'Observed Insulated', lw=1.5)
+plt.plot(Time/60.,Temp_insC, 'r', label = 'Model Insulated', lw=1.5)
+plt.plot(TestTime,O2, 'g', label = 'Observed Open-Air', lw=1.5)
+plt.plot(Time/60.,Temp_openC, 'b', label = 'Model Open-Air', lw=1.5)
+#plt.plot(TestTime,I4, 'k--', label = 'Test I4', lw=1.5)
 
+#plt.plot(TestTime,O4, 'g--', label = 'Test O2', lw=1.5)
+plt.legend(bbox_to_anchor=(1, 1),
+           bbox_transform=plt.gcf().transFigure)
 pylab.show()
 
 # a = np.asarray([ Time, Temp, Duct_Temp ])
