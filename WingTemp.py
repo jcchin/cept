@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 from openmdao.api import Component, ScipyGMRES, Newton, IndepVarComp
 from openmdao.units.units import convert_units as cu
+import numpy as np
+from scipy.interpolate import splev, splrep
 
 class WingTemp(Component):
     def __init__(self):
@@ -8,13 +10,14 @@ class WingTemp(Component):
         self.deriv_options['type'] = "cs"
 
         self.add_param('sol_heat_flux', 1145.0, desc='solar heat flux', units='W/m**2')
-        self.add_param('AMO', 1366.0, desc='', units='W/m**2')
+        # self.add_param('AMO', 1366.0, desc='', units='W/m**2')
         self.add_param('SBconstantq', 5.67e-08, desc='Stefan Boltzmann Constant', units='W/m**2*K**4')
-        self.add_param('absorb', 0.4, desc='Solar Absorbtivity')
+        self.add_param('absorb', 0.425, desc='Solar Absorbtivity')
         self.add_param('emiss', 0.9, desc='Emissivity')
-        self.add_param('skyTemp', 239.0, desc='Sky Temperature', units='K')
+        self.add_param('skyTemp', 283.0, desc='Sky Temperature', units='K')
         self.add_param('airTemp', 318.0, desc='Air Temperature', units='K')
-        self.add_param('area', 6.0, desc='Area', units='m**2')
+        self.add_param('area', 6.2, desc='Area', units='m**2') #14.7 mod 2  6.2 mod 4
+        #chord length at tip (0.5334)
 
         self.add_state('plateTemp', 500.00, desc='Plate Temperature', units='K')
         self.add_output('sol_heat', 458.0, desc='Solar Heat', units='W')
@@ -31,7 +34,7 @@ class WingTemp(Component):
         sol_heat = p['sol_heat_flux']*p['area']*p['absorb']
         r['sol_heat'] = u['sol_heat'] - sol_heat  # manual residual
 
-        conv_heat = 1.32*((u['plateTemp']-p['airTemp'])**0.25)*(u['plateTemp']-p['airTemp'])
+        conv_heat = 1.32*(((u['plateTemp']-p['airTemp'])/0.5334)**0.25)*p['area']*(u['plateTemp']-p['airTemp'])
         r['conv_heat'] = u['conv_heat'] - conv_heat
 
         rad_heat = p['emiss']*p['SBconstantq']*p['area']*(u['plateTemp']**4 - p['skyTemp']**4)
@@ -55,29 +58,66 @@ if __name__ == '__main__':
     root.ln_solver = ScipyGMRES()
     root.nl_solver = Newton()
     #p.root.set_order(['bal', 'comp'])
-    p.root.nl_solver.options['iprint'] = 1
+    p.root.nl_solver.options['iprint'] = 0
     p.root.nl_solver.options['maxiter'] = 10
     p.setup()
     #p.root.list_connections()
 
     # average effective blackbody temperature of the sky,
     # use between -34C to 10C (Section 4.5.2)
-    p['comp.skyTemp'] = 273-34
+    # p['comp.skyTemp'] = 273.-34.
+    # p.run()
+    # print('Results:  Sky Temp |    Plate Temp  ')
+    # print('            -34C   |  %3.1f degC  %3.1f degF ' % (cu(p['comp.plateTemp'],'degK','degC'), cu(p['comp.plateTemp'],'degK','degF')))
 
-    p.run()
-    print('Results:  Sky Temp |    Plate Temp  ')
-    print('            -34C   |  %3.1f degC  %3.1f degF ' % (cu(p['comp.plateTemp'],'degK','degC'), cu(p['comp.plateTemp'],'degK','degF')))
+    # p['comp.skyTemp'] = 273.+10.
+    # p.run()
+    # print('             10C   |  %3.1f degC  %3.1f degF ' % (cu(p['comp.plateTemp'],'degK','degC'), cu(p['comp.plateTemp'],'degK','degF')))
 
-    p['comp.skyTemp'] = 273+10
-    p.run()
-    print('             10C   |  %3.1f degC  %3.1f degF ' % (cu(p['comp.plateTemp'],'degK','degC'), cu(p['comp.plateTemp'],'degK','degF')))
+    # p['comp.skyTemp'] = 273.+10.
+    # p['comp.absorb'] = 0.2
+    # p.run()
+    # print('')
+    # print('absorb=0.2,  10C   |  %3.1f degC  %3.1f degF ' % (cu(p['comp.plateTemp'],'degK','degC'), cu(p['comp.plateTemp'],'degK','degF')))
 
-    p['comp.skyTemp'] = 273+10
-    p['comp.absorb'] = 0.2
-    p.run()
-    print('')
-    print('absorb=0.2,  10C   |  %3.1f degC  %3.1f degF ' % (cu(p['comp.plateTemp'],'degK','degC'), cu(p['comp.plateTemp'],'degK','degF')))
+    #wind correction factor
+    fw = [1., 0.25, 0.17, 0.11]
+    ws = [0., 2.,     4.,   10.]
 
+    wsx = np.arange(0, 10., 0.5)
+    spl = splrep(ws,fw, k=2)
+    fwt = splev(wsx,spl)
+
+    T10 = np.zeros(len(fwt))
+
+    for i,fwi in enumerate(fwt):
+        p.run()
+        delta = p['comp.plateTemp'] - p['comp.airTemp']
+        delta2 = delta * fwi
+        plateTemp2 = p['comp.airTemp']+delta2
+        T10[i] =  cu(plateTemp2,'degK','degC')
+
+    print(T10)
+
+
+import plotly.plotly as py
+from plotly import tools
+import plotly.graph_objs as go
+
+
+# Create traces
+trace0 = go.Scatter(
+    x = wsx,
+    y = T10,
+    mode = 'lines',
+    name = 'Wing Temp'
+)
+
+data = [trace0]
+
+py.iplot(data, filename='wingv2')
+
+    # quit()
 # NASA TM 2008 215633 Table 4-8
 #              |  Design High Solar Radiation |
 #   Time of Day|   BTU/ft^2/hr  |    W/m^2    |
