@@ -157,3 +157,39 @@ pylab.show()
 # output = np.column_stack((Time.flatten(),Temp.flatten(),Wire_Temp.flatten()))
 # np.savetxt('temp_data.csv',output,delimiter=',')
 
+import plotly.plotly as py
+from plotly import tools
+import plotly.graph_objs as go
+
+
+# Create traces
+trace0 = go.Scatter(
+    x = Time/60,
+    y = Temp_ins,
+    mode = 'lines',
+    name = 'InsModel'
+)
+
+trace1 = go.Scatter(
+    x = TestTime,
+    y = I2,
+    mode = 'lines',
+    name = 'InsTest'
+)
+
+trace2 = go.Scatter(
+    x = Time/60,
+    y = Temp_open,
+    mode = 'lines',
+    name = 'InsModel'
+)
+
+trace3 = go.Scatter(
+    x = TestTime,
+    y = O2,
+    mode = 'lines',
+    name = 'InsTest'
+)
+data = [trace0, trace1, trace2, trace3]
+
+py.iplot(data, filename='test1')
