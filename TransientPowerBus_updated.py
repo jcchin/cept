@@ -26,6 +26,7 @@ import math as m
 import matplotlib.pyplot as plt
 import pylab
 from itertools import accumulate
+import scipy.integrate as integrate
 
 # Mission Inputs
 app_alt = 457.2  # approach altitude, in meters (1500 ft)
@@ -63,179 +64,79 @@ inverter_efficiency = 0.95
 
 # wire specs
 RperL = 0.00096 #RperL = 0.005208 #.003276  # (ohm/m) resistance of AWG 10 wire
-#num_conduct = 6 #4
-#bundle_derating = 0.5125
-# num_conduct = 8  # 4 conducters per wire, *2 positive and return lines
-# bundle_derating = 0.375
-#num_bus = 2 # number of power busses
 
 alt_derating = 0.925
 d = 0.01905  # (m) duct diameter
 circ_tpe = 0.040132 # jacket circumference
-# cd = 2.05E-3 #2.59E-3
-# AperStrand = num_conduct * num_bus * (np.pi*(cd)**2/4.)  # total Cu area
-# Cp = 385.  # Copper Specific Heat
-# rho = 8890.  # Copper Density
-# HC = AperStrand*Cp*rho  # Heat Capacity of Copper Wire
+
 HC = 240.
 ts = 0.1  # time step for Euler Integration
 hC = 3.3
 hD = 3.3
-#q_conv = 0.  # starting heat rate (q) out
-#T_wire = 49.  # starting wire temperature
-#T_duct = 49.  # starting duct temperature (Celcius)
-T_cruise = 49.
-T_dep = 49.
+
+T_cruise0 = 49.
+T_dep0 = 49.
 T_ambient = 49.
 #--------------------------------------------------
 
 # cumulative mission time breakpoints for altitude table lookup
 mc = list(accumulate([m1,m2,m3,m4,m5,m6,m7,m8,m9,m10,m11,m12,m13,m14,m15,m16]))
 
-time =     [0, mc[5],   mc[6],      mc[7],      mc[8],   mc[9], mc[10],  mc[11],  mc[12], mc[13], mc[15]]
-altitude = [0,     0, app_alt, cruise_alt, cruise_alt, app_alt,     0, app_alt, app_alt,      0,      0]  # m
+time =       [0,  mc[1], mc[2], mc[3], mc[4], mc[5], mc[6],   mc[7],      mc[8],      mc[9],  mc[10], mc[11],  mc[12],  mc[13], mc[14],  mc[15]]
+altitude =   [0.,    0.,    0.,    0.,    0.,    0.,    0., app_alt, cruise_alt, cruise_alt, app_alt,     0., app_alt, app_alt,     0.,     0.]  # m
+DEP_pwr =    [0.,    0.,    0.,   30.,    0.,   30.,   15.,      0.,         0.,         0.,     15.,    15.,      0.,     15.,     0.,     0.]
+Cruise_pwr = [2.5,   0.,   30.,    0.,    0.,   30.,   30.,     30.,       22.5,        15.,      0.,    30.,    22.5,      0.,    3.8,    2.5]
+
+
+def lookup(x, schedule):
+             #Taxi            # TO Checklist              Cruise Runup              HLP Runup              Flight go/no-go                Ground roll             Climb to 1000 feet           Cruise Climb                 Cruise                Descent to 1000 feet        Final approach            Go around to 1000 feet          Approach pattern               Final Approach           Rollout and turnoff                 Taxi
+    conds = [x < mc[0], (x > mc[0]) & (x < mc[1]), (x > mc[1]) & (x < mc[2]), (x > mc[2]) & (x < mc[3]), (x > mc[3]) & (x < mc[4]), (x > mc[4]) & (x < mc[5]),(x > mc[5]) & (x < mc[6]), (x > mc[6]) & (x < mc[7]), (x > mc[7]) & (x < mc[8]), (x > mc[8]) & (x < mc[9]), (x > mc[9]) & (x < mc[10]), (x > mc[10]) & (x < mc[11]), (x > mc[11]) & (x < mc[12]), (x > mc[12]) & (x < mc[13]), (x > mc[13]) & (x < mc[14]), (x > mc[14]) & (x < mc[15])]
+    return np.select(conds, schedule)
 
 #http://www.engineeringtoolbox.com/standard-atmosphere-d_604.html
 alt_table = [-1000, 0, 1000, 2000, 3000, 4000, 5000, 6000, 7000] # meters
 temp_table = [49., 49., 8.5, 2., -4.49, -10.98, -17.47, -23.96, -30.45] # Celsius (21.5 @ 0 in reality, using 49 to be conservative)
-#gravity_table = [9.81,9.807,9.804,9.801,9.797,9.794,9.791,9.788,9.785]
-#pressure_table = [11.39,10.13,8.988,7.95,7.012,6.166,5.405,4.722,4.111]
-#kin_viscosity_table = [1.35189E-05,1.46041E-05,1.58094E-05,1.714E-05,1.86297E-05,2.02709E-05,2.21076E-05,2.4163E-05,2.64576E-05]
-
-# http://www.engineeringtoolbox.com/air-properties-d_156.html
-#temperature_table = [-100,-50,0,20,40,60,80,100,120,140,160,180,200]
-#k_table = [0.016,0.0204,0.0243,0.0257,0.0271,0.0285,0.0299,0.0314,0.0328,0.0343,0.0358,0.0372,0.0386]
-#Pr_table = [0.74,0.725,0.715,0.713,0.711,0.709,0.708,0.703,0.7,0.695,0.69,0.69,0.685]
-
-#http://www.engineeringtoolbox.com/dry-air-properties-d_973.html
-#temperature_alpha = [-73,-23,27,77,127]
-#alpha_table = [0.00001017,0.00001567,0.00002207,0.00002918,0.00003694]
 
 # initiate transient variable arrays
-t_len = int(mc[-1] * 1./ts)
-Time = np.zeros(t_len)
-Temp_cruise = np.zeros(t_len)
-Temp_dep = np.zeros(t_len)
+times= np.arange(0, mc[-1], ts)
 
 # perform engineering calculations in a 'for' loop
 # across the entire mission length updating state values for each time step
 # (Euler Integration of Duct Temperature State)
-for i,t in enumerate(np.arange(0, mc[-1], ts)):
+def dxdt(temp,t):
 
-    if t <= mc[0]:  # Taxi from NASA
-        dep_power = 0.0  # kW
-        cruise_power = 2.5  # kW
+    cruise_power = lookup(t, Cruise_pwr)  # kW
+    dep_power = lookup(t, DEP_pwr)  # kW
 
-    elif t > mc[0] and t <= mc[1]:  # TO Checklist
-        dep_power = 0.0  # kW
-        cruise_power = 0.0  # kW
-
-    elif t > mc[1] and t <= mc[2]:  # Cruise Runup
-        dep_power = 0.0  # kW
-        cruise_power = 30.0  # kW
-
-    elif t > mc[2] and t <= mc[3]:  # HLP Runup
-        dep_power = 30.0  # kW
-        cruise_power = 0.0  # kW
-
-    elif t > mc[3] and t <= mc[4]:  # Flight go/no-go
-        dep_power = 0.0  # kW
-        cruise_power = 0.0  # kW
-
-    elif t > mc[4] and t <= mc[5]:  # Ground roll
-        dep_power = 30.0  # kW
-        cruise_power = 30.0  # kW
-
-    elif t > mc[5] and t <= mc[6]:  # Climb to 1000 feet
-        dep_power = 15.0  # kW
-        cruise_power = 30.0  # kW
-
-    elif t > mc[6] and t <= mc[7]:  # Cruise Climb
-        dep_power = 0.0  # kW
-        cruise_power = 30.0  # kW
-
-    elif t > mc[7] and t <= mc[8]:  # CruiseW
-        dep_power = 0.0  # kW
-        cruise_power = 22.5  # kW
-
-    elif t > mc[8] and t <= mc[9]:  # Descent to 1000 feet
-        dep_power = 0.0  # kW
-        cruise_power = 15.0  # kW
-
-    elif t > mc[9] and t <= mc[10]:  # Final approach
-        dep_power = 15.0  # kW
-        cruise_power = 0.0  # kW
-
-    elif t > mc[10] and t <= mc[11]:  # Go around to 1000 feet
-        dep_power = 15.0  # kW
-        cruise_power = 30.0  # kW
-
-    elif t > mc[11] and t <= mc[12]:  # Approach pattern
-        dep_power = 0.0  # kW
-        cruise_power = 22.5  # kW
-
-    elif t > mc[12] and t <= mc[13]:  # Final Approach
-        dep_power = 15.0  # kW
-        cruise_power = 0.0  # kW
-
-    elif t > mc[13] and t <= mc[14]:  # Rollout and turnoff
-        dep_power = 0.0  # kW
-        cruise_power = 3.8  # kW
-
-    #elif t>2955 and t<=3555:
-    else:               # Taxi to NASA
-        dep_power = 0.0  # kW
-        cruise_power = 2.5  # kW
-
-    # else:
-    #     print('error')
-    #     quit()
     alt = np.interp(t, time, altitude)
     T_ambient = 49.#np.interp(alt, alt_table, temp_table)
-    #kinematic_viscosity = np.interp(alt, alt_table, kin_viscosity_table)
-    #k_air = np.interp(T_ambient, temperature_table, k_table)
-    #Pr = np.interp(T_ambient, temperature_table, Pr_table)
-
-    # CRUISE BUS
-    # cruise_bus_power = cruise_power/(motor_efficiency*inverter_efficiency)  # kW
-    # cruise_bus_current = 1000*cruise_bus_power/bus_voltage  # ****
-    # cruise_current_per_conductor = cruise_bus_current/(num_conduct)
-    # cruise_current_rating_per_conductor = cruise_current_per_conductor/(bundle_derating*alt_derating)
-    # q_prime_cruise = cruise_current_per_conductor**2 * RperL
 
     cruise_bus_power = cruise_power/(motor_efficiency*inverter_efficiency)  # kW
     cruise_bus_current = (1000.*cruise_bus_power/bus_voltage)/alt_derating  # ****
     q_prime_cruise = cruise_bus_current**2. * RperL
 
-
     # DEP BUS
     dep_bus_power = dep_power/(motor_efficiency*inverter_efficiency)  # kW
     dep_bus_current = (1000*dep_bus_power/bus_voltage)/alt_derating  # ****
     q_prime_dep = dep_bus_current**2 * RperL
-    # Temp_ROC_dep = q_prime_dep/(HC)
-    # T_wire_dep = T_wire_dep + (ts*Temp_ROC_dep)
 
-    q_prime_outC = circ_tpe * (T_cruise-T_ambient) * hC
-    q_prime_outD = circ_tpe * (T_dep-T_ambient) * hD
+    q_prime_outC = circ_tpe * (temp[0]-T_ambient) * hC #T_cruise
+    q_prime_outD = circ_tpe * (temp[1]-T_ambient) * hD #T_dep
 
     Temp_ROCC = (q_prime_cruise - q_prime_outC) / HC
     Temp_ROCD = (q_prime_dep - q_prime_outD) / HC
-    T_cruise = T_cruise + (ts*Temp_ROCC)
-    T_dep = T_dep + (ts*Temp_ROCD)
 
-    # save instantaneous states to array
-    Time[i] = t
-    #Temp[i] = T_wire
-    #Duct_Temp[i] = T_duct
-    Temp_cruise[i] = T_cruise
-    Temp_dep[i] = T_dep
+    return [Temp_ROCC, Temp_ROCD]
+
+
+Temp_wires = integrate.odeint(dxdt,[T_cruise0, T_dep0],times)
 
 # Print Results
 
 plt.figure()
 
-plt.plot(Time,Temp_cruise, 'b', label = 'Cruise Ducts', lw=1.5)
-plt.plot(Time,Temp_dep, 'g', label = 'DEP Ducts', lw=1.5)
+plt.plot(times,Temp_wires[:,0], 'b', label = 'Cruise Ducts', lw=1.5)
+plt.plot(times,Temp_wires[:,1], 'g', label = 'DEP Ducts', lw=1.5)
 
 plt.legend(bbox_to_anchor=(1, 1),
            bbox_transform=plt.gcf().transFigure)
@@ -261,10 +162,10 @@ plt.text(mc[9]+150, 60,'Go-Around', fontsize=8)
 plt.axvline(mc[10], color='k', linestyle='--',lw=0.5)
 plt.axvline(mc[11], color='k', linestyle='--',lw=0.5)
 plt.axvline(mc[12], color='k', linestyle='--',lw=0.5)
-plt.axhline(max(Temp_cruise), color='k', linestyle='--',lw=1)
+plt.axhline(max(Temp_wires[:,0]), color='k', linestyle='--',lw=1)
 plt.axhline(74, color='g', linestyle='--',lw=1)
 plt.text(2400, 74,['Temp Limit: %2.0f' % 76], fontsize=16)
-plt.text(2400, max(Temp_cruise),['Max Temp: %2.2f' % max(Temp_cruise)], fontsize=16)
+plt.text(2400, max(Temp_wires[:,0]),['Max Temp: %2.2f' % max(Temp_wires[:,0])], fontsize=16)
 pylab.show()
 
 # a = np.asarray([ Time, Temp, Duct_Temp ])
@@ -273,3 +174,27 @@ pylab.show()
 # output = np.column_stack((Time.flatten(),Temp.flatten(),Duct_Temp.flatten()))
 # np.savetxt('temp_data.csv',output,delimiter=',')
 
+
+# import plotly.plotly as py
+# from plotly import tools
+# import plotly.graph_objs as go
+
+
+# # Create traces
+# trace0 = go.Scatter(
+#     x = Time,
+#     y = Temp_cruise,
+#     mode = 'lines',
+#     name = 'Cruise'
+# )
+
+# trace1 = go.Scatter(
+#     x = Time,
+#     y = Temp_dep,
+#     mode = 'lines',
+#     name = 'DEP'
+# )
+
+# data = [trace0, trace1]
+
+# py.iplot(data, filename='wire_test')
