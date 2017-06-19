@@ -88,17 +88,25 @@ if __name__ == '__main__':
     spl = splrep(ws,fw, k=2)
     fwt = splev(wsx,spl)
 
-    T10 = np.zeros(len(fwt))
+    T10h = np.zeros(len(fwt))
+    T10l = np.zeros(len(fwt))
 
+    p.run()
     for i,fwi in enumerate(fwt):
-        p.run()
         delta = p['comp.plateTemp'] - p['comp.airTemp']
         delta2 = delta * fwi
         plateTemp2 = p['comp.airTemp']+delta2
-        T10[i] =  cu(plateTemp2,'degK','degC')
+        T10h[i] =  cu(plateTemp2,'degK','degC')
+    print(cu(p['comp.plateTemp'],'degK','degC'))
+    p['comp.emiss'] = 0.8
+    p.run()
+    for i,fwi in enumerate(fwt):
+        delta = p['comp.plateTemp'] - p['comp.airTemp']
+        delta2 = delta * fwi
+        plateTemp2 = p['comp.airTemp']+delta2
+        T10l[i] =  cu(plateTemp2,'degK','degC')
 
-    print(T10)
-
+quit()
 
 import plotly.plotly as py
 from plotly import tools
@@ -108,14 +116,19 @@ import plotly.graph_objs as go
 # Create traces
 trace0 = go.Scatter(
     x = wsx,
-    y = T10,
+    y = T10h,
     mode = 'lines',
-    name = 'Wing Temp'
+    name = 'Emiss = 0.9'
 )
+trace1 = go.Scatter(
+    x = wsx,
+    y = T10l,
+    mode = 'lines',
+    name = 'Emiss = 0.8'
+)
+data = [trace0, trace1]
 
-data = [trace0]
-
-py.iplot(data, filename='wingv2')
+py.iplot(data, filename='wingv3')
 
     # quit()
 # NASA TM 2008 215633 Table 4-8
