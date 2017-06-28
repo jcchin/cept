@@ -13,11 +13,13 @@ import scipy.integrate as integrate
 
 A_conv_motor = .0474  # m^2
 h_conv_motor = 30  # W/m^2-C
+r_motor = 0.25  # K/W
 len_motor = 0.065
 eff_motor = 0.95
 
 A_conv_inv = 0.05  # m^2 - estimate of available cabin surface area for external convection
 h_conv_inv = 50  # W/m^2-C estimate of cabin external convection coefficient (computed for Lc = 0.8m, u_0=50 m/s)
+r_sink = 0.25  # K/W
 len_inv = 0.08
 eff_inv = 0.97
 
@@ -43,7 +45,7 @@ mcp_nacelle = m_nacelle_air*cp_air
 mcp_motor = m_inv*cp_al
 mcp_inv = m_motor*cp_al
 
-T_0 = 30  # C module and aircraft equilibrium temperature at start (HOT DAY)
+T_0 = 35.  # C module and aircraft equilibrium temperature at start (HOT DAY)
 
 ts = 0.5  # time step, s
 
@@ -69,7 +71,7 @@ U0 = columns['U0']  # speed
 
 #http://www.engineeringtoolbox.com/standard-atmosphere-d_604.html
 alt_table = [-1000, 0, 1000, 2000, 3000, 4000, 5000, 6000, 7000] # meters
-temp_table = [49., 49., 8.5, 2., -4.49, -10.98, -17.47, -23.96, -30.45] # Celsius (21.5 @ 0 in reality, using 49 to be conservative)
+temp_table = [35., 35., 35., 8.5, 2., -4.49, -10.98, -17.47, -23.96]#, -30.45] # Celsius (21.5 @ 0 in reality, using 49 to be conservative)
 
 def lookup(x, schedule):
              #Taxi            # TO Checklist              Cruise Runup              HLP Runup              Flight go/no-go                Ground roll             Climb to 1000 feet           Cruise Climb                 Cruise                Descent to 1000 feet        Final approach            Go around to 1000 feet          Approach pattern               Final Approach           Rollout and turnoff                 Taxi
@@ -105,9 +107,10 @@ def dxdt(temp, t):
     alt = np.interp(t, time, altitude)
     T_0 = np.interp(alt, alt_table, temp_table)
 
-    Pmotor = 1000./12.*dep_power  # W, total power requested by propulsion
+    Pmotor = (1000./12.)*dep_power  # W, total power requested by propulsion
     Qmotor = (1.-eff_motor)*Pmotor  # W, instantaneous heat dissipated by the motor
     Qinv = (1.-eff_motor)*(Pmotor+Qmotor)  # W, inverter heat diss
+
 
     # convection model - adjacent plates
     #Tfilm = 0.5*(temp[0]+temp[2]+273.)  # guesstimate of freeconv film temperature
@@ -125,8 +128,8 @@ def dxdt(temp, t):
     U_conv_inv = h_conv_inv*A_conv_inv
 
     #convection rates from module and cabin from current time step T's
-    Qconv_motor = U_conv_motor*(temp[0]-T_0)
-    Qconv_inv = U_conv_inv*(temp[1]-T_0)
+    Qconv_motor = U_conv_motor*((1.-r_motor)*temp[0]-T_0)
+    Qconv_inv = U_conv_inv*((1.-r_motor)*temp[1]-T_0)
 
     #temperature corrections
     dT_motor = (Qmotor - Qconv_motor)/mcp_motor  # cabin with module and avionics heat load
@@ -142,6 +145,7 @@ def dxdt(temp, t):
     # Module_Ra.extend([Ra_module])
     # Module_Nusselt.extend([Nu_module])
     # Delta_T.extend([temp[0] - temp[2]])
+    print(dep_power)
     Q_gen.extend([Qmotor])
 
     return [dT_motor, dT_inv]
@@ -173,7 +177,7 @@ ax5 = fig1.add_subplot(111)
 
 ax1.plot(times, Temp_states[:,0], 'r-', label='Motor Temperature')
 # ax2.plot(times, Temp_states[:,2], 'g-', label='Cabin Temperature')
-# ax3.plot(solverTime, Ambient_Temp, 'b-', label='Ambient Temperature')
+ax3.plot(times, Temp_states[:,1], 'k-', label='Inverter Temperature')
 ax4.plot(solverTime, Q_gen, 'g-', label='Motor Heat (W)')
 ax5.plot(solverTime, Ambient_Temp, 'b-', label='Ambient Temp (C)')
 
@@ -183,6 +187,6 @@ ax4.set_ylabel('Module absorbed heat rate(W)', color='k')
 
 legend = ax1.legend(loc='upper center', shadow=True)
 #legend = ax2.legend(loc='upper center', shadow=True)
-legend = ax4.legend(loc='upper center', shadow=True)
+#legend = ax4.legend(loc='upper center', shadow=True)
 
 plt.show()
