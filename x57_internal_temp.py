@@ -155,15 +155,15 @@ def dxdt(temp, t):
     U_conv_module = hconv_module*A_conv_module
 
     #convection rates from module and cabin from current time step T's
-    Qconv_cabin = -U_conv_cabin*ts*(temp[2]-T_0)
+    Qconv_cabin = -U_conv_cabin*(temp[2]-T_0)
     Qconv_module = -U_conv_module*(temp[0]-temp[2])
     Qconv_module_Ad = -U_conv_module*(temp[1]-temp[3])  # for adiabatic cabin
 
     #temperature corrections
-    dT_cabin = (Qmisc - N_module*Qconv_module + Qconv_cabin)*ts/(mcp_cabin_air+mcp_cabin)  # cabin with module and avionics heat load
-    dT_module = (Qdiss + Qconv_module)*ts/mcp_module  # module heat loss to convection
-    dT_module_Ad = (Qdiss + Qconv_module_Ad)*ts/mcp_module
-    dT_cabin_Ad = (Qmisc - N_module*Qconv_module_Ad)*ts/(mcp_cabin_air+mcp_cabin)
+    dT_cabin = (Qmisc - N_module*Qconv_module + Qconv_cabin)/(mcp_cabin_air+mcp_cabin)  # cabin with module and avionics heat load
+    dT_module = (Qdiss + Qconv_module)/mcp_module  # module heat loss to convection
+    dT_module_Ad = (Qdiss + Qconv_module_Ad)/mcp_module
+    dT_cabin_Ad = (Qmisc - N_module*Qconv_module_Ad)/(mcp_cabin_air+mcp_cabin)
 
     # save off other useful info (not integrated states)
     # note: the time breakpoints are "solverTime", not "times"
