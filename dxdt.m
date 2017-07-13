@@ -4,13 +4,14 @@ function [ dT ] = dxdt( t,temp )
     global solverTime
     global Ambient_Temp % np.zeros(t_len)  % ambient temp --> per altitude model
     global Q_gen  % rate of heat absorbed by battery module
+    global Delta_T
 
     global DEP_pwr
     global altitude
     global temp_table
     global alt_table
     global time
-    
+
     dep_power = interp1(time, [0 DEP_pwr],t(1),'next');
     alt = interp1(time, [0 altitude],t(1));
     T_0 = interp1(alt_table, temp_table, alt);
@@ -42,8 +43,8 @@ function [ dT ] = dxdt( t,temp )
     cp_air = 1005;  % J/kg-C specific heat of air (average)
     cp_al = 900;  % J/kg-C specific heat of aluminum grid and external plate
     m_nacelle_air = 1.;  % m^3
-    m_inv = 0.5;  % kg, grid and external plate area per 160 cell module.
-    m_motor = 1.0;  % kg mass of cells per 160 cell module
+    m_inv = 1.0;  % kg, grid and external plate area per 160 cell module.
+    m_motor = 2.0;  % kg mass of cells per 160 cell module
 
     mcp_nacelle = m_nacelle_air*cp_air;
     mcp_motor = m_inv*cp_al;
@@ -82,6 +83,9 @@ function [ dT ] = dxdt( t,temp )
     %       to allow forsolver adaptive time stepping
     solverTime = [solverTime t];
     Ambient_Temp = [Ambient_Temp T_0];
+
+    if (Pmotor < 10000)
+        Delta_T = [Delta_T dT_motor];
     Q_gen = [Q_gen Qmotor];
 
 end
