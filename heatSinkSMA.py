@@ -18,7 +18,7 @@ class HeatSink(ExplicitComponent):
         # self.deriv_options['type'] = "fd"
 
         self.add_input('InvPwr', shape=(nn,), val=10000, desc='total power through the inverter', units='W')
-        self.add_input('Inv_eff', shape=(nn,), val=0.96, desc='inverter efficiency')
+        self.add_input('Inv_eff', shape=(nn,), val=0.97, desc='inverter efficiency')
         self.add_input('T_air', shape=(nn,), val=47., desc='Cooling Air Temp', units='degC')
         self.add_input('T_max', shape=(nn,), val=100., desc='Maximum Electronics Temp', units='degC')
         self.add_input('sink_w', shape=(nn,), val=.15, desc='Heat Sink Base Width', units='m')
@@ -232,7 +232,7 @@ if __name__ == '__main__':
     printstuff()
     #quit()
 
-    # from mpl_toolkits.mplot3d import Axes3D
+    from mpl_toolkits.mplot3d import Axes3D
     import matplotlib.pyplot as plt
     # # Some sample data
     # #x_side = arange(4., 24., .25) # velocity
@@ -243,106 +243,54 @@ if __name__ == '__main__':
     Za = zeros(np.shape(X))
     Zb = zeros(np.shape(X))
 
-    # p['hs.flag'] = 2
-    # for i,cfm in enumerate(x_side):
-    #     for j,ht in enumerate(y_side):
-    #         p['hs.cfm'] = cfm
-    #         p['hs.fin_h2'] = ht
-    #         p.run()
-    #         p.run()
-    #         p.run()
-    #         Z[j,i] = p['hs.R_tot']
-    #         Za[j,i] = p['hs.fin_gap']
-    #         Zb[j,i] = p['hs.fin_w']
+    p['hs.flag'] = 2
+    for i,cfm in enumerate(x_side):
+        for j,ht in enumerate(y_side):
+            p['hs.cfm'] = cfm
+            p['hs.fin_h2'] = ht
+            p.run_driver()
+            Z[j,i] = p['hs.R_tot']
+            Za[j,i] = p['hs.fin_gap']
+            Zb[j,i] = p['hs.fin_w']
 
-    #         if (cfm == 0.004 and ht == 0.035000000000000024):
-    #             print('CFM, H-->', cfm, ht, ' R_tot, Fin_gap, Fin_W, N_fins')
-    #             print(cfm,ht,p['hs.R_tot'],p['hs.fin_gap'],p['hs.fin_w'],p['hs.n_fins'])
-    #             print
-    # #quit()
-    # # Assign colors based off some user-defined condition
-    # COLORS = empty(X.shape, dtype=str)
-    # COLORS[:,:] = 'r'
-    # COLORS[Z<p['hs.R_max']] = 'y'
-    # COLORS[Z<(p['hs.R_max']-p['hs.R_case']-p['hs.R_grease'])] = 'g'
+            # if (cfm == 0.004 and ht == 0.035000000000000024):
+            #     print('CFM, H-->', cfm, ht, ' R_tot, Fin_gap, Fin_W, N_fins')
+            #     print(cfm,ht,p['hs.R_tot'],p['hs.fin_gap'],p['hs.fin_w'],p['hs.n_fins'])
+            #     print
+    #quit()
+    # Assign colors based off some user-defined condition
+    COLORS = empty(X.shape, dtype=str)
+    COLORS[:,:] = 'r'
+    COLORS[Z<p['hs.R_max']] = 'y'
+    COLORS[Z<(p['hs.R_max']-p['hs.R_case']-p['hs.R_grease'])] = 'g'
 
-    # # 3D surface plot
-    # fig = plt.figure()
-    # ax = fig.gca(projection='3d')
-    # surf = ax.plot_surface(X, Y, Z, facecolors=COLORS, rstride=1, cstride=1,
-    #         linewidth=0)
-    # ax.set_xlabel('CFM (m^3/s)')
-    # ax.set_ylabel('Fin Height (m)')
-    # ax.set_zlabel('Thermal Resistance')
-    # plt.show()
+    # 3D surface plot
+    fig = plt.figure()
+    ax = fig.gca(projection='3d')
+    surf = ax.plot_surface(X, Y, Z, facecolors=COLORS, rstride=1, cstride=1,
+            linewidth=0)
+    ax.set_xlabel('CFM (m^3/s)')
+    ax.set_ylabel('Fin Height (m)')
+    ax.set_zlabel('Thermal Resistance')
+    plt.show()
 
-    # fig = plt.figure()
-    # ax = fig.gca(projection='3d')
-    # surf = ax.plot_surface(X, Y, Za, facecolors=COLORS, rstride=1, cstride=1,
-    #         linewidth=0)
-    # ax.set_xlabel('CFM (m^3/s)')
-    # ax.set_ylabel('Fin Height (m)')
-    # ax.set_zlabel('fin gap')
-    # plt.show()
+    fig = plt.figure()
+    ax = fig.gca(projection='3d')
+    surf = ax.plot_surface(X, Y, Za, facecolors=COLORS, rstride=1, cstride=1,
+            linewidth=0)
+    ax.set_xlabel('CFM (m^3/s)')
+    ax.set_ylabel('Fin Height (m)')
+    ax.set_zlabel('fin gap')
+    plt.show()
 
-    # fig = plt.figure()
-    # ax = fig.gca(projection='3d')
-    # surf = ax.plot_surface(X, Y, Zb, facecolors=COLORS, rstride=1, cstride=1,
-    #         linewidth=0)
-    # ax.set_xlabel('CFM (m^3/s)')
-    # ax.set_ylabel('Fin Height (m)')
-    # ax.set_zlabel('Fin thickness')
-    # plt.show()
+    fig = plt.figure()
+    ax = fig.gca(projection='3d')
+    surf = ax.plot_surface(X, Y, Zb, facecolors=COLORS, rstride=1, cstride=1,
+            linewidth=0)
+    ax.set_xlabel('CFM (m^3/s)')
+    ax.set_ylabel('Fin Height (m)')
+    ax.set_zlabel('Fin thickness')
+    plt.show()
 
-# plotly imports
-
-import plotly.plotly as py
-from plotly import tools
-from plotly.graph_objs import Surface
-
-
-#send data to Plotly
-scene = dict(
-    xaxis=dict(
-        title='Velocity',
-        gridcolor='rgb(255, 255, 255)',
-        zerolinecolor='rgb(255, 255, 255)',
-        showbackground=True,
-        backgroundcolor='rgb(230, 230,230)'
-    ),
-    yaxis=dict(
-        title='Fin Height',
-        gridcolor='rgb(255, 255, 255)',
-        zerolinecolor='rgb(255, 255, 255)',
-        showbackground=True,
-        backgroundcolor='rgb(230, 230,230)'
-    ),
-    zaxis=dict(
-        gridcolor='rgb(255, 255, 255)',
-        zerolinecolor='rgb(255, 255, 255)',
-        showbackground=True,
-        backgroundcolor='rgb(230, 230,230)'
-    )
-)
-
-pfig = tools.make_subplots(rows=1, cols=3,
-                          specs=[[{'is_3d': True},{'is_3d': True},{'is_3d': True}]])
-pfig.append_trace(
-    dict(x=X, y= Y, z=Z, type='surface', scene='scene1'), 1, 1)
-    # dict(x=cmapdata.Wc_data[0,:,:], y= cmapdata.PR_data[0,:,:], z=cmapdata.eff_data[0,:,:], opacity=0.9, type='surface', scene='scene1'))
-
-pfig.append_trace(
-    dict(x=X, y= Y, z=Za, type='surface',scene='scene2'), 1, 2)
-    # dict(x=tmapdata.PR_vals[0,:,:], y= tmapdata.Wp_data[0,:,:], z=tmapdata.eff_data[0,:,:], opacity=0.9, type='surface',scene='scene2'))
-
-pfig.append_trace(
-    dict(x=X, y= Y, z=Zb, type='surface',scene='scene3'), 1, 3)
-    # dict(x=tmapdata.PR_vals[0,:,:], y= tmapdata.Wp_data[0,:,:], z=tmapdata.eff_data[0,:,:], opacity=0.9, type='surface',scene='scene2'))
-
-pfig['layout']['scene1'].update(scene)
-pfig['layout']['scene2'].update(scene)
-pfig['layout']['scene3'].update(scene)
-
-# py.iplot(pfig, filename="test_comp")
 
 
