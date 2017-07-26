@@ -16,7 +16,7 @@ from pycycle.balance import Balance
 class HeatSink(ExplicitComponent):
 
     def initialize(self):
-    	self.metadata.declare('num_nodes', type_=int)
+        self.metadata.declare('num_nodes', type_=int)
 
     def setup(self):
         nn = self.metadata['num_nodes']
@@ -52,18 +52,18 @@ class HeatSink(ExplicitComponent):
 
     def compute(self, inputs, outputs):
 
-    	Q = inputs['MotorPwr']*(1-inputs['Motor_eff'])
-    	outputs['R_max'] = (inputs['T_max'] - inputs['T_amb'])/Q
+        Q = inputs['MotorPwr']*(1-inputs['Motor_eff'])
+        outputs['R_max'] = (inputs['T_max'] - inputs['T_amb'])/Q
 
-    	Pr = (inputs['mu']*inputs['Cp'])/inputs['k_air']
-    	Nu = 2.656*inputs['gamm_eff']*Pr**(1./3.) #non-ducted
-    	H = inputs['R_outer'] - inputs['R_inner']
-    	sink_w = 2 * np.pi*inputs['R_outer']
-    	Abase = sink_w * inputs['sink_l']
+        Pr = (inputs['mu']*inputs['Cp'])/inputs['k_air']
+        Nu = 2.656*inputs['gamm_eff']*Pr**(1./3.) #non-ducted
+        H = inputs['R_outer'] - inputs['R_inner']
+        sink_w = 2 * np.pi*inputs['R_outer']
+        Abase = sink_w * inputs['sink_l']
 
 
-    	# this section changes depending on whether you're putting a user defined heatsink in or optimizing based on velocity
-        V = inputs['V_in'] 
+        # this section changes depending on whether you're putting a user defined heatsink in or optimizing based on velocity
+        V = inputs['V_in']
         b = outputs['fin_gap'] = 0.002 # user input
         # b = outputs['fin_gap'] = 2.*inputs['gamm_eff']*sqrt((inputs['nu']*inputs['sink_l'])/V) # Optimized fin gap
         outputs['fin_w'] = .002 # user input
@@ -90,7 +90,7 @@ class HeatSink(ExplicitComponent):
 
         # outer skin calcs
         Nu_out = 0.664*Re**(0.5)*Pr**(1/3)
-       	h_conv_motor = 30#(Nu_out*inputs['k_air'])/.04
+        h_conv_motor = 30#(Nu_out*inputs['k_air'])/.04
         Iron_cond = 79.5 # W/m*K
         Iron_t = .0035 # m
         Al_cond = 230  # W/m*K      # aluminum conductivity
@@ -127,7 +127,7 @@ class HeatSink(ExplicitComponent):
         x = (2*h)/(inputs['k_hs']*t_fin)
         m = sqrt(x)
         eff_fin = tanh(m*H)/(m*H)
-        R_hs = (h*(Abase+(N_fin*eff_fin*.025*.0225)))**-1 
+        R_hs = (h*(Abase+(N_fin*eff_fin*.025*.0225)))**-1
         # outputs['R_tot'] = (((R_hs + R_metal)**-1)+((R_skin)**-1))**-1
         outputs['R_tot'] = R_skin #(no heat sink)
 
@@ -139,20 +139,20 @@ class HeatSink(ExplicitComponent):
         print(T_final)
 
 # class HeatSinkOpt(Group):
-	
-# 	def initialize(self):
+
+#   def initialize(self):
 #         self.metadata.declare('num_nodes', type_=int)
 
-# 	def setup(self):
+#   def setup(self):
 #         nn = self.metadata['num_nodes']
-# 		self.add_subsystem('hs', HeatSink(num_nodes=1))
-# 		self.add_subsystem('balance', Balance(units="m/s", input_units="degK/W"))
+#    self.add_subsystem('hs', HeatSink(num_nodes=1))
+#    self.add_subsystem('balance', Balance(units="m/s", input_units="degK/W"))
 
-# 		self.connect('balance.indep', 'hs.V_in')
-# 		self.connect('hs.R_max', 'balance.lhs')
-# 		self.connect('hs.R_tot', 'balance.rhs')
+#    self.connect('balance.indep', 'hs.V_in')
+#    self.connect('hs.R_max', 'balance.lhs')
+#    self.connect('hs.R_tot', 'balance.rhs')
 
-# 		# newton = self.nonlinear_solver = NewtonSolver()
+#    # newton = self.nonlinear_solver = NewtonSolver()
 #         newton.options['atol'] = 1e-6
 #         newton.options['rtol'] = 1e-6
 #         newton.options['iprint'] = 2
@@ -187,29 +187,29 @@ if __name__ == '__main__':
 
     p.setup(check=False)
     def printstuff():
-	    print('=============')
-	    print('V_in (m/s) : %f' %p['hs.V_in'])
-	    # print('Nu : %f' %p['hs.Nu'])
-	    # print('Pr : %f' %p['hs.Pr'])
-	    # print('Re : %f' %p['hs.Re'])
-	    # print('L* : %f' %p['hs.Lstar'])
-	    # print('alpha : %f' %p['hs.alpha'])
-	    # print('fin height: %f' %p['hs.fin_h'])
-	    # print('lambda : %f' %p['hs.lambda'])
-	    # print('omega : %f' %p['hs.omega'])
-	    # print('R_max : %f' %p['hs.R_max'])
-	    # print('R_global: %f' % p['hs.R_global'])
-	    # print('zeta_thin : %f' %p['hs.zeta_thin'])
-	    print('# of fins : %f' %p['hs.n_fins'])
-	    # print('-------------')
-	    print('fin thickness (m): %f' % p['hs.fin_w'])
-	    print('fin gap (m): %f' % p['hs.fin_gap'])
-	    print('Volumetric Flow Rate (m^3/s): %f' % p['hs.V_dot'])
-	    print('Maximum thermal resistance (K/W): %f' %p['hs.R_max'])
-	    print('Actual total thermal resistance (K/W): %f' % p['hs.R_tot'])
-	    print('Pressure Drop (Pa): %f' % p['hs.dP'])
-	    # print('h %f' % p['hs.h'])
-	    # print('R_max %f' % p['hs.R_max'])
+        print('=============')
+        print('V_in (m/s) : %f' %p['hs.V_in'])
+        # print('Nu : %f' %p['hs.Nu'])
+        # print('Pr : %f' %p['hs.Pr'])
+        # print('Re : %f' %p['hs.Re'])
+        # print('L* : %f' %p['hs.Lstar'])
+        # print('alpha : %f' %p['hs.alpha'])
+        # print('fin height: %f' %p['hs.fin_h'])
+        # print('lambda : %f' %p['hs.lambda'])
+        # print('omega : %f' %p['hs.omega'])
+        # print('R_max : %f' %p['hs.R_max'])
+        # print('R_global: %f' % p['hs.R_global'])
+        # print('zeta_thin : %f' %p['hs.zeta_thin'])
+        print('# of fins : %f' %p['hs.n_fins'])
+        # print('-------------')
+        print('fin thickness (m): %f' % p['hs.fin_w'])
+        print('fin gap (m): %f' % p['hs.fin_gap'])
+        print('Volumetric Flow Rate (m^3/s): %f' % p['hs.V_dot'])
+        print('Maximum thermal resistance (K/W): %f' %p['hs.R_max'])
+        print('Actual total thermal resistance (K/W): %f' % p['hs.R_tot'])
+        print('Pressure Drop (Pa): %f' % p['hs.dP'])
+        # print('h %f' % p['hs.h'])
+        # print('R_max %f' % p['hs.R_max'])
     p.run_model()
 
     printstuff()
